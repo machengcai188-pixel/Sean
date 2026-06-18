@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>World Cup Predictor</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <main class="app-shell">
+    <section class="topbar">
+      <div>
+        <p class="eyebrow">FIFA World Cup 2026</p>
+        <h1>Match Predictor</h1>
+      </div>
+      <div class="top-actions">
+        <button id="refreshBtn" class="primary-btn" type="button">Refresh FIFA data</button>
+        <button id="sampleBtn" class="ghost-btn" type="button">Load demo</button>
+      </div>
+    </section>
+
+    <section class="control-grid">
+      <div class="panel match-panel">
+        <div class="panel-head">
+          <h2>Fixture</h2>
+          <span id="dataStatus" class="status">Waiting for refresh</span>
+        </div>
+        <div class="fixture-filter">
+          <label for="fixtureTeamFilter">Show matches for</label>
+          <select id="fixtureTeamFilter">
+            <option value="">All teams</option>
+          </select>
+          <span id="fixtureFilterStatus" class="filter-status">Showing every published match</span>
+        </div>
+        <label for="fixtureSelect">Official FIFA match</label>
+        <select id="fixtureSelect">
+          <option value="">Refresh FIFA data to load fixtures</option>
+        </select>
+        <div class="team-selectors">
+          <label>
+            Team A
+            <select id="teamASelect"></select>
+          </label>
+          <label>
+            Team B
+            <select id="teamBSelect"></select>
+          </label>
+        </div>
+        <div id="fixtureMeta" class="fixture-meta"></div>
+      </div>
+
+      <div class="panel model-panel">
+        <div class="panel-head">
+          <h2>Model Weights</h2>
+          <button id="resetWeightsBtn" class="tiny-btn" type="button">Reset</button>
+        </div>
+        <div id="weightsGrid" class="weights-grid"></div>
+      </div>
+    </section>
+
+    <section class="prediction-band">
+      <div class="score-card">
+        <p id="teamALabel">Team A</p>
+        <strong id="teamAScore">--</strong>
+      </div>
+      <div class="prediction-card">
+        <p class="eyebrow">Prediction</p>
+        <h2 id="predictionText">Choose a match</h2>
+        <div id="confidenceText" class="confidence">Refresh FIFA data, then select a fixture.</div>
+        <div id="factorBreakdown" class="factor-breakdown"></div>
+        <div class="prob-bars">
+          <div>
+            <span id="aProbLabel">A win</span>
+            <div class="bar"><i id="aProbBar"></i></div>
+            <b id="aProb">--</b>
+          </div>
+          <div>
+            <span>Tie</span>
+            <div class="bar"><i id="tieProbBar"></i></div>
+            <b id="tieProb">--</b>
+          </div>
+          <div>
+            <span id="bProbLabel">B win</span>
+            <div class="bar"><i id="bProbBar"></i></div>
+            <b id="bProb">--</b>
+          </div>
+        </div>
+      </div>
+      <div class="score-card">
+        <p id="teamBLabel">Team B</p>
+        <strong id="teamBScore">--</strong>
+      </div>
+    </section>
+
+    <section class="panel review-panel model-review-section">
+      <div class="panel-head">
+        <div>
+          <h2>Model Review</h2>
+          <p>Completed FIFA matches are compared with the tool's pre-match prediction, then the model calibration is adjusted conservatively.</p>
+        </div>
+        <span id="reviewStatus" class="status">Waiting for refresh</span>
+      </div>
+      <div id="reviewMetrics" class="review-metrics"></div>
+      <div id="reviewReasons" class="review-reasons"></div>
+      <div id="reviewTable" class="table-wrap review-table"></div>
+    </section>
+
+    <section class="panel assumptions-panel">
+      <div class="panel-head">
+        <div>
+          <h2>Player Assumptions</h2>
+          <p>FIFA supplies roster, position, age, height, weight, caps and goals. Elite international production now creates an automatic star-player boost; scout traits remain editable.</p>
+        </div>
+        <button id="clearOverridesBtn" class="ghost-btn" type="button">Clear edits</button>
+      </div>
+      <div class="assumption-editor">
+        <label>
+          Player
+          <select id="playerSelect"></select>
+        </label>
+        <div id="playerSliders" class="player-sliders"></div>
+      </div>
+    </section>
+
+    <section class="squad-grid">
+      <div class="panel">
+        <div class="panel-head">
+          <h2 id="teamAPlayersTitle">Team A Players</h2>
+          <span id="teamALoading" class="status"></span>
+        </div>
+        <div id="teamATable" class="table-wrap"></div>
+      </div>
+      <div class="panel">
+        <div class="panel-head">
+          <h2 id="teamBPlayersTitle">Team B Players</h2>
+          <span id="teamBLoading" class="status"></span>
+        </div>
+        <div id="teamBTable" class="table-wrap"></div>
+      </div>
+    </section>
+
+    <section class="panel notes-panel">
+      <h2>Suggestions Built In</h2>
+      <ul>
+        <li>Use the best XI plus squad depth, not a plain average of all 26 players.</li>
+        <li>Give elite players more influence through caps, goals, big-game production and star power.</li>
+        <li>Use the previous eight World Cups to distinguish established tournament powers from inexperienced teams.</li>
+        <li>Keep subjective scout inputs editable because FIFA does not publish first touch, mentality, xG, xA or pressures in the free official roster endpoint.</li>
+      </ul>
+    </section>
+  </main>
+
+  <script src="./app.js"></script>
+</body>
+</html>

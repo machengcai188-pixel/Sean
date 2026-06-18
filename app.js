@@ -95,10 +95,6 @@ const els = {
   fixtureMeta: document.getElementById("fixtureMeta"),
   weightsGrid: document.getElementById("weightsGrid"),
   resetWeightsBtn: document.getElementById("resetWeightsBtn"),
-  teamALabel: document.getElementById("teamALabel"),
-  teamBLabel: document.getElementById("teamBLabel"),
-  teamAScore: document.getElementById("teamAScore"),
-  teamBScore: document.getElementById("teamBScore"),
   predictionText: document.getElementById("predictionText"),
   confidenceText: document.getElementById("confidenceText"),
   aProbLabel: document.getElementById("aProbLabel"),
@@ -435,8 +431,6 @@ async function predictSelected() {
     updatePredictionEmpty();
     return;
   }
-  els.teamALabel.textContent = teamDisplay(teamA);
-  els.teamBLabel.textContent = teamDisplay(teamB);
   els.aProbLabel.textContent = `${teamA.abbr || "A"} win`;
   els.bProbLabel.textContent = `${teamB.abbr || "B"} win`;
 
@@ -682,8 +676,6 @@ function matchContextBoost(team, fixture, side) {
 function renderPrediction(aReport, bReport) {
   const result = calculatePrediction(aReport, bReport, state.calibration);
   const confidence = result.pickCode === "TIE" ? result.tieProb : Math.max(result.aProb, result.bProb);
-  els.teamAScore.textContent = aReport.finalScore.toFixed(1);
-  els.teamBScore.textContent = bReport.finalScore.toFixed(1);
   els.predictionText.textContent = result.pickText;
   els.confidenceText.textContent = `Model confidence: ${(confidence * 100).toFixed(0)}%. Star players and previous World Cup performance now carry more weight.`;
   els.factorBreakdown.innerHTML = `
@@ -691,6 +683,9 @@ function renderPrediction(aReport, bReport) {
     <div class="factor-chip">Star power<strong>${aReport.starPower.toFixed(0)} - ${bReport.starPower.toFixed(0)}</strong></div>
     <div class="factor-chip">Current form<strong>${aReport.form.toFixed(0)} - ${bReport.form.toFixed(0)}</strong></div>
   `;
+  [els.aProbBar, els.tieProbBar, els.bProbBar].forEach((bar) => bar.parentElement.parentElement.classList.remove("is-pick"));
+  const pickedBar = result.pickCode === "A" ? els.aProbBar : result.pickCode === "B" ? els.bProbBar : els.tieProbBar;
+  pickedBar.parentElement.parentElement.classList.add("is-pick");
   updateBar(els.aProbBar, els.aProb, result.aProb);
   updateBar(els.bProbBar, els.bProb, result.bProb);
   updateBar(els.tieProbBar, els.tieProb, result.tieProb);
@@ -1131,11 +1126,10 @@ function weightedScore(metrics, weights) {
 }
 
 function updatePredictionEmpty() {
-  els.teamAScore.textContent = "--";
-  els.teamBScore.textContent = "--";
   els.predictionText.textContent = "Choose two teams";
   els.confidenceText.textContent = "Select a FIFA fixture or choose two teams manually.";
   els.factorBreakdown.innerHTML = "";
+  [els.aProbBar, els.tieProbBar, els.bProbBar].forEach((bar) => bar.parentElement.parentElement.classList.remove("is-pick"));
   updateBar(els.aProbBar, els.aProb, 0);
   updateBar(els.bProbBar, els.bProb, 0);
   updateBar(els.tieProbBar, els.tieProb, 0);

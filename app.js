@@ -78,6 +78,8 @@ const state = {
   calibration: { ...DEFAULT_CALIBRATION },
   reviewRunId: 0,
   predictionRunId: 0,
+  headToHeadRunId: 0,
+  headToHeadCache: new Map(),
   fixtureTeamFilter: "",
   worldCupHistory: new Map(),
   historyLoaded: false
@@ -118,7 +120,11 @@ const els = {
   reviewStatus: document.getElementById("reviewStatus"),
   reviewMetrics: document.getElementById("reviewMetrics"),
   reviewReasons: document.getElementById("reviewReasons"),
-  reviewTable: document.getElementById("reviewTable")
+  reviewTable: document.getElementById("reviewTable"),
+  headToHeadTitle: document.getElementById("headToHeadTitle"),
+  headToHeadStatus: document.getElementById("headToHeadStatus"),
+  headToHeadSummary: document.getElementById("headToHeadSummary"),
+  headToHeadMatches: document.getElementById("headToHeadMatches")
 };
 
 init();
@@ -429,8 +435,10 @@ async function predictSelected() {
   const fixture = state.selectedFixture;
   if (!teamA || !teamB || teamA.id === teamB.id) {
     updatePredictionEmpty();
+    renderHeadToHeadEmpty("Choose two different teams to see their previous results.");
     return;
   }
+  updateHeadToHead(teamA, teamB);
   els.aProbLabel.textContent = `${teamA.abbr || "A"} win`;
   els.bProbLabel.textContent = `${teamB.abbr || "B"} win`;
 
@@ -443,6 +451,116 @@ async function predictSelected() {
   renderTeamReport(bReport, "B");
   renderPrediction(aReport, bReport);
   renderPlayerSelect(aReport, bReport);
+}
+
+async function updateHeadToHead(teamA, teamB) {
+  const runId = ++state.headToHeadRunId;
+  els.headToHeadTitle.textContent = `${teamDisplay(teamA)} vs ${teamDisplay(teamB)}`;
+  els.headToHeadStatus.textContent = "Loading FIFA history...";
+  els.headToHeadSummary.innerHTML = "";
+  els.headToHeadMatches.innerHTML = `<div class="head-to-head-empty">Searching FIFA's official match archive...</div>`;
+
+  try {
+    const teamMatches = await loadTeamMatchHistory(teamA.id);
+    if (runId !== state.headToHeadRunId) return;
+    const meetings = teamMatches
+      .filter((match) => (
+        isPlayed(match)
+        && [match.Home?.IdTeam, match.Away?.IdTeam].includes(teamA.id)
+        && [match.Home?.IdTeam, match.Away?.IdTeam].includes(teamB.id)
+      ))
+      .filter((match, index, rows) => rows.findIndex((item) => item.IdMatch === match.IdMatch) === index)
+      .sort((a, b) => new Date(b.Date) - new Date(a.Date));
+    renderHeadToHead(teamA, teamB, meetings);
+  } catch (error) {
+    console.warn("Head-to-head history was unavailable", error);
+    if (runId !== state.headToHeadRunId) return;
+    els.headToHeadStatus.textContent = "History unavailable";
+    renderHeadToHeadEmpty("FIFA's match archive could not be reached. Try Refresh FIFA data again in a moment.");
+  }
+}
+
+function loadTeamMatchHistory(teamId) {
+  if (state.headToHeadCache.has(teamId)) return state.headToHeadCache.get(teamId);
+  const url = `${FIFA.api}/calendar/matches?language=${FIFA.language}&count=500&idTeam=${teamId}`;
+  const request = fetchJson(url)
+    .then((data) => data.Results || [])
+    .catch((error) => {
+      state.headToHeadCache.delete(teamId);
+      throw error;
+    });
+  state.headToHeadCache.set(teamId, request);
+  return request;
+}
+
+function renderHeadToHead(teamA, teamB, meetings) {
+  const results = meetings.map((match) => headToHeadOutcome(match, teamA.id));
+  const aWins = results.filter((result) => result === "A").length;
+  const bWins = results.filter((result) => result === "B").length;
+  const draws = results.filter((result) => result === "D").length;
+  els.headToHeadStatus.textContent = `${meetings.length} previous meeting${meetings.length === 1 ? "" : "s"}${meetings.length > 10 ? " · latest 10 shown" : ""}`;
+  els.headToHeadSummary.innerHTML = `
+    <div class="head-to-head-stat"><span>Meetings</span><strong>${meetings.length}</strong></div>
+    <div class="head-to-head-stat"><span>${escapeHtml(teamA.abbr || teamA.name)} wins</span><strong>${aWins}</strong></div>
+    <div class="head-to-head-stat"><span>Draws</span><strong>${draws}</strong></div>
+    <div class="head-to-head-stat"><span>${escapeHtml(teamB.abbr || teamB.name)} wins</span><strong>${bWins}</strong></div>
+  `;
+
+  if (!meetings.length) {
+    renderHeadToHeadEmpty(`No previous meetings between ${teamDisplay(teamA)} and ${teamDisplay(teamB)} were found in FIFA's match archive.`);
+    return;
+  }
+
+  els.headToHeadMatches.innerHTML = meetings.slice(0, 10).map((match) => {
+    const competition = text(match.CompetitionName) || text(match.SeasonName) || "International match";
+    return `
+      <div class="head-to-head-match">
+        <span class="head-to-head-date">${escapeHtml(formatHistoryDate(match.Date))}</span>
+        <strong class="head-to-head-score">${escapeHtml(headToHeadScore(match))}</strong>
+        <span class="head-to-head-competition">${escapeHtml(competition)}</span>
+      </div>
+    `;
+  }).join("");
+}
+
+function renderHeadToHeadEmpty(message) {
+  els.headToHeadStatus.textContent = "No history shown";
+  els.headToHeadSummary.innerHTML = "";
+  els.headToHeadMatches.innerHTML = `<div class="head-to-head-empty">${escapeHtml(message)}</div>`;
+}
+
+function headToHeadOutcome(match, teamAId) {
+  if (match.Winner) return match.Winner === teamAId ? "A" : "B";
+  const teamAIsHome = match.Home?.IdTeam === teamAId;
+  const teamAScore = number(teamAIsHome ? match.Home?.Score : match.Away?.Score, 0);
+  const teamBScore = number(teamAIsHome ? match.Away?.Score : match.Home?.Score, 0);
+  if (teamAScore === teamBScore) return "D";
+  return teamAScore > teamBScore ? "A" : "B";
+}
+
+function headToHeadScore(match) {
+  const home = match.Home?.Abbreviation || teamName(match.Home);
+  const away = match.Away?.Abbreviation || teamName(match.Away);
+  const homeScore = number(match.Home?.Score, 0);
+  const awayScore = number(match.Away?.Score, 0);
+  const homePens = match.HomeTeamPenaltyScore;
+  const awayPens = match.AwayTeamPenaltyScore;
+  const penalties = homePens !== null && homePens !== undefined
+    && awayPens !== null && awayPens !== undefined
+    && number(homePens, 0) + number(awayPens, 0) > 0
+    ? ` (pens ${homePens}-${awayPens})`
+    : "";
+  return `${home} ${homeScore}-${awayScore} ${away}${penalties}`;
+}
+
+function formatHistoryDate(value) {
+  if (!value) return "Date unavailable";
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: EASTERN_TIME_ZONE,
+    year: "numeric",
+    month: "short",
+    day: "numeric"
+  }).format(new Date(value));
 }
 
 function selectedMatchOptions(matchSide, fixture = state.selectedFixture) {

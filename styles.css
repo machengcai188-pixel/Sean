@@ -358,6 +358,75 @@ input[type="number"] {
   background: var(--green);
 }
 
+.head-to-head-section {
+  margin-bottom: 16px;
+}
+
+.head-to-head-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.head-to-head-stat {
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #f7fafc;
+}
+
+.head-to-head-stat span {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.head-to-head-stat strong {
+  display: block;
+  margin-top: 4px;
+  font-size: 24px;
+}
+
+.head-to-head-matches {
+  display: grid;
+  gap: 8px;
+}
+
+.head-to-head-match {
+  display: grid;
+  grid-template-columns: minmax(110px, 0.7fr) minmax(210px, 1.4fr) minmax(170px, 1fr);
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: white;
+}
+
+.head-to-head-date,
+.head-to-head-competition {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.head-to-head-score {
+  font-size: 15px;
+  font-weight: 850;
+}
+
+.head-to-head-empty {
+  padding: 18px;
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+  color: var(--muted);
+  background: #f7fafc;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
 .model-review-section {
   margin-bottom: 16px;
 }
@@ -540,6 +609,7 @@ td.score {
   .weights-grid,
   .player-sliders,
   .review-metrics,
+  .head-to-head-summary,
   .factor-breakdown,
   .prob-bars {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -559,8 +629,14 @@ td.score {
   .prob-bars,
   .player-sliders,
   .review-metrics,
+  .head-to-head-summary,
   .factor-breakdown {
     grid-template-columns: 1fr;
+  }
+
+  .head-to-head-match {
+    grid-template-columns: 1fr;
+    gap: 4px;
   }
 
   .fixture-filter label,

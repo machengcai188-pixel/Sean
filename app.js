@@ -78,8 +78,8 @@ const state = {
   calibration: { ...DEFAULT_CALIBRATION },
   reviewRunId: 0,
   predictionRunId: 0,
-  headToHeadRunId: 0,
-  headToHeadCache: new Map(),
+  teamHistoryRunId: 0,
+  teamHistoryCache: new Map(),
   fixtureTeamFilter: "",
   worldCupHistory: new Map(),
   historyLoaded: false
@@ -121,10 +121,13 @@ const els = {
   reviewMetrics: document.getElementById("reviewMetrics"),
   reviewReasons: document.getElementById("reviewReasons"),
   reviewTable: document.getElementById("reviewTable"),
-  headToHeadTitle: document.getElementById("headToHeadTitle"),
-  headToHeadStatus: document.getElementById("headToHeadStatus"),
-  headToHeadSummary: document.getElementById("headToHeadSummary"),
-  headToHeadMatches: document.getElementById("headToHeadMatches")
+  teamHistoryStatus: document.getElementById("teamHistoryStatus"),
+  teamAHistoryTitle: document.getElementById("teamAHistoryTitle"),
+  teamAHistorySummary: document.getElementById("teamAHistorySummary"),
+  teamAHistoryMatches: document.getElementById("teamAHistoryMatches"),
+  teamBHistoryTitle: document.getElementById("teamBHistoryTitle"),
+  teamBHistorySummary: document.getElementById("teamBHistorySummary"),
+  teamBHistoryMatches: document.getElementById("teamBHistoryMatches")
 };
 
 init();
@@ -435,10 +438,10 @@ async function predictSelected() {
   const fixture = state.selectedFixture;
   if (!teamA || !teamB || teamA.id === teamB.id) {
     updatePredictionEmpty();
-    renderHeadToHeadEmpty("Choose two different teams to see their previous results.");
+    renderTeamHistoriesEmpty("Choose two different teams to see each team's match history.");
     return;
   }
-  updateHeadToHead(teamA, teamB);
+  updateTeamHistories(teamA, teamB);
   els.aProbLabel.textContent = `${teamA.abbr || "A"} win`;
   els.bProbLabel.textContent = `${teamB.abbr || "B"} win`;
 
@@ -453,94 +456,126 @@ async function predictSelected() {
   renderPlayerSelect(aReport, bReport);
 }
 
-async function updateHeadToHead(teamA, teamB) {
-  const runId = ++state.headToHeadRunId;
-  els.headToHeadTitle.textContent = `${teamDisplay(teamA)} vs ${teamDisplay(teamB)}`;
-  els.headToHeadStatus.textContent = "Loading FIFA history...";
-  els.headToHeadSummary.innerHTML = "";
-  els.headToHeadMatches.innerHTML = `<div class="head-to-head-empty">Searching FIFA's official match archive...</div>`;
+async function updateTeamHistories(teamA, teamB) {
+  const runId = ++state.teamHistoryRunId;
+  els.teamHistoryStatus.textContent = "Loading 2026 World Cup histories...";
+  renderTeamHistoryLoading(teamA, "A");
+  renderTeamHistoryLoading(teamB, "B");
 
   try {
-    const teamMatches = await loadTeamMatchHistory(teamA.id);
-    if (runId !== state.headToHeadRunId) return;
-    const meetings = teamMatches
-      .filter((match) => (
-        isPlayed(match)
-        && [match.Home?.IdTeam, match.Away?.IdTeam].includes(teamA.id)
-        && [match.Home?.IdTeam, match.Away?.IdTeam].includes(teamB.id)
-      ))
-      .filter((match, index, rows) => rows.findIndex((item) => item.IdMatch === match.IdMatch) === index)
-      .sort((a, b) => new Date(b.Date) - new Date(a.Date));
-    renderHeadToHead(teamA, teamB, meetings);
+    const [teamAMatches, teamBMatches] = await Promise.all([
+      loadTeamMatchHistory(teamA.id),
+      loadTeamMatchHistory(teamB.id)
+    ]);
+    if (runId !== state.teamHistoryRunId) return;
+    renderTeamHistory(teamA, teamAMatches, "A");
+    renderTeamHistory(teamB, teamBMatches, "B");
+    els.teamHistoryStatus.textContent = "2026 World Cup matches only";
   } catch (error) {
-    console.warn("Head-to-head history was unavailable", error);
-    if (runId !== state.headToHeadRunId) return;
-    els.headToHeadStatus.textContent = "History unavailable";
-    renderHeadToHeadEmpty("FIFA's match archive could not be reached. Try Refresh FIFA data again in a moment.");
+    console.warn("Team World Cup history was unavailable", error);
+    if (runId !== state.teamHistoryRunId) return;
+    renderTeamHistoriesEmpty("FIFA's match archive could not be reached. Try again in a moment.");
   }
 }
 
 function loadTeamMatchHistory(teamId) {
-  if (state.headToHeadCache.has(teamId)) return state.headToHeadCache.get(teamId);
+  if (state.teamHistoryCache.has(teamId)) return state.teamHistoryCache.get(teamId);
   const url = `${FIFA.api}/calendar/matches?language=${FIFA.language}&count=500&idTeam=${teamId}`;
   const request = fetchJson(url)
     .then((data) => data.Results || [])
     .catch((error) => {
-      state.headToHeadCache.delete(teamId);
+      state.teamHistoryCache.delete(teamId);
       throw error;
     });
-  state.headToHeadCache.set(teamId, request);
+  state.teamHistoryCache.set(teamId, request);
   return request;
 }
 
-function renderHeadToHead(teamA, teamB, meetings) {
-  const results = meetings.map((match) => headToHeadOutcome(match, teamA.id));
-  const aWins = results.filter((result) => result === "A").length;
-  const bWins = results.filter((result) => result === "B").length;
-  const draws = results.filter((result) => result === "D").length;
-  els.headToHeadStatus.textContent = `${meetings.length} previous meeting${meetings.length === 1 ? "" : "s"}${meetings.length > 10 ? " · latest 10 shown" : ""}`;
-  els.headToHeadSummary.innerHTML = `
-    <div class="head-to-head-stat"><span>Meetings</span><strong>${meetings.length}</strong></div>
-    <div class="head-to-head-stat"><span>${escapeHtml(teamA.abbr || teamA.name)} wins</span><strong>${aWins}</strong></div>
-    <div class="head-to-head-stat"><span>Draws</span><strong>${draws}</strong></div>
-    <div class="head-to-head-stat"><span>${escapeHtml(teamB.abbr || teamB.name)} wins</span><strong>${bWins}</strong></div>
+function renderTeamHistoryLoading(team, side) {
+  const title = side === "A" ? els.teamAHistoryTitle : els.teamBHistoryTitle;
+  const summary = side === "A" ? els.teamAHistorySummary : els.teamBHistorySummary;
+  const matches = side === "A" ? els.teamAHistoryMatches : els.teamBHistoryMatches;
+  title.textContent = `${teamDisplay(team)} match history`;
+  summary.innerHTML = "";
+  matches.innerHTML = `<div class="history-empty">Loading ${escapeHtml(team.abbr || team.name)} 2026 World Cup results...</div>`;
+}
+
+function renderTeamHistory(team, archive, side) {
+  const title = side === "A" ? els.teamAHistoryTitle : els.teamBHistoryTitle;
+  const summary = side === "A" ? els.teamAHistorySummary : els.teamBHistorySummary;
+  const matches = side === "A" ? els.teamAHistoryMatches : els.teamBHistoryMatches;
+  const completed = archive
+    .filter((match) => (
+      isPlayed(match)
+      && is2026FifaWorldCupMatch(match)
+      && [match.Home?.IdTeam, match.Away?.IdTeam].includes(team.id)
+    ))
+    .filter((match, index, rows) => rows.findIndex((item) => item.IdMatch === match.IdMatch) === index)
+    .sort((a, b) => new Date(b.Date) - new Date(a.Date));
+  const outcomes = completed.map((match) => teamHistoryOutcome(match, team.id));
+  const wins = outcomes.filter((outcome) => outcome === "W").length;
+  const draws = outcomes.filter((outcome) => outcome === "D").length;
+  const losses = outcomes.filter((outcome) => outcome === "L").length;
+
+  title.textContent = `${teamDisplay(team)} match history`;
+  summary.innerHTML = `
+    <div><span>Matches</span><strong>${completed.length}</strong></div>
+    <div class="team-history-win"><span>Wins</span><strong>${wins}</strong></div>
+    <div class="team-history-draw"><span>Draws</span><strong>${draws}</strong></div>
+    <div class="team-history-loss"><span>Losses</span><strong>${losses}</strong></div>
   `;
 
-  if (!meetings.length) {
-    renderHeadToHeadEmpty(`No previous meetings between ${teamDisplay(teamA)} and ${teamDisplay(teamB)} were found in FIFA's match archive.`);
+  if (!completed.length) {
+    matches.innerHTML = `<div class="history-empty">No completed 2026 FIFA World Cup matches were found for ${escapeHtml(teamDisplay(team))}.</div>`;
     return;
   }
 
-  els.headToHeadMatches.innerHTML = meetings.slice(0, 10).map((match) => {
-    const competition = text(match.CompetitionName) || text(match.SeasonName) || "International match";
+  matches.innerHTML = completed.map((match) => {
+    const outcome = teamHistoryOutcome(match, team.id);
+    const competition = text(match.SeasonName) || text(match.CompetitionName) || "FIFA World Cup";
     return `
-      <div class="head-to-head-match">
-        <span class="head-to-head-date">${escapeHtml(formatHistoryDate(match.Date))}</span>
-        <strong class="head-to-head-score">${escapeHtml(headToHeadScore(match))}</strong>
-        <span class="head-to-head-competition">${escapeHtml(competition)}</span>
+      <div class="team-history-match">
+        <span class="team-history-result result-${outcome.toLowerCase()}">${outcome}</span>
+        <div>
+          <strong>${escapeHtml(matchHistoryScore(match))}</strong>
+          <span>${escapeHtml(formatHistoryDate(match.Date))} · ${escapeHtml(competition)}</span>
+        </div>
       </div>
     `;
   }).join("");
 }
 
-function renderHeadToHeadEmpty(message) {
-  els.headToHeadStatus.textContent = "No history shown";
-  els.headToHeadSummary.innerHTML = "";
-  els.headToHeadMatches.innerHTML = `<div class="head-to-head-empty">${escapeHtml(message)}</div>`;
+function renderTeamHistoriesEmpty(message) {
+  els.teamHistoryStatus.textContent = "No history shown";
+  ["A", "B"].forEach((side) => {
+    const title = side === "A" ? els.teamAHistoryTitle : els.teamBHistoryTitle;
+    const summary = side === "A" ? els.teamAHistorySummary : els.teamBHistorySummary;
+    const matches = side === "A" ? els.teamAHistoryMatches : els.teamBHistoryMatches;
+    title.textContent = `Team ${side} history`;
+    summary.innerHTML = "";
+    matches.innerHTML = `<div class="history-empty">${escapeHtml(message)}</div>`;
+  });
 }
 
-function headToHeadOutcome(match, teamAId) {
-  if (match.Winner) return match.Winner === teamAId ? "A" : "B";
-  const teamAIsHome = match.Home?.IdTeam === teamAId;
-  const teamAScore = number(teamAIsHome ? match.Home?.Score : match.Away?.Score, 0);
-  const teamBScore = number(teamAIsHome ? match.Away?.Score : match.Home?.Score, 0);
-  if (teamAScore === teamBScore) return "D";
-  return teamAScore > teamBScore ? "A" : "B";
+function is2026FifaWorldCupMatch(match) {
+  const competition = `${text(match.CompetitionName)} ${text(match.SeasonName)}`.toLowerCase();
+  return competition.includes("fifa world cup")
+    && competition.includes("2026")
+    && !competition.includes("qualif");
 }
 
-function headToHeadScore(match) {
-  const home = match.Home?.Abbreviation || teamName(match.Home);
-  const away = match.Away?.Abbreviation || teamName(match.Away);
+function teamHistoryOutcome(match, teamId) {
+  if (match.Winner) return match.Winner === teamId ? "W" : "L";
+  const teamIsHome = match.Home?.IdTeam === teamId;
+  const teamScore = number(teamIsHome ? match.Home?.Score : match.Away?.Score, 0);
+  const opponentScore = number(teamIsHome ? match.Away?.Score : match.Home?.Score, 0);
+  if (teamScore === opponentScore) return "D";
+  return teamScore > opponentScore ? "W" : "L";
+}
+
+function matchHistoryScore(match) {
+  const home = teamName(match.Home) || match.Home?.Abbreviation || "Home team";
+  const away = teamName(match.Away) || match.Away?.Abbreviation || "Away team";
   const homeScore = number(match.Home?.Score, 0);
   const awayScore = number(match.Away?.Score, 0);
   const homePens = match.HomeTeamPenaltyScore;

@@ -49,12 +49,22 @@
         <div id="fixtureMeta" class="fixture-meta"></div>
       </div>
 
-      <div class="panel model-panel">
-        <div class="panel-head">
-          <h2>Model Weights</h2>
-          <button id="resetWeightsBtn" class="tiny-btn" type="button">Reset</button>
-        </div>
-        <div id="weightsGrid" class="weights-grid"></div>
+      <div class="panel model-panel collapsible-panel">
+        <details>
+          <summary class="panel-head collapsible-summary">
+            <div>
+              <h2>Model Weights</h2>
+              <p>Open this only when you want to adjust how the predictor thinks.</p>
+            </div>
+            <span class="collapse-hint"></span>
+          </summary>
+          <div class="collapsible-body">
+            <div class="section-toolbar">
+              <button id="resetWeightsBtn" class="tiny-btn" type="button">Reset</button>
+            </div>
+            <div id="weightsGrid" class="weights-grid"></div>
+          </div>
+        </details>
       </div>
     </section>
 
@@ -84,6 +94,17 @@
       </div>
     </section>
 
+    <section class="panel stage-status-section">
+      <div class="panel-head">
+        <div>
+          <h2>Stage Points & Pass Status</h2>
+          <p>Shows each selected team's current 2026 World Cup stage points and whether they are in a passing position.</p>
+        </div>
+        <span id="stageStatusLabel" class="status">Choose two teams</span>
+      </div>
+      <div id="stageStatusCards" class="stage-status-cards"></div>
+    </section>
+
     <section class="panel team-history-section">
       <div class="panel-head">
         <div>
@@ -106,34 +127,48 @@
       </div>
     </section>
 
-    <section class="panel review-panel model-review-section">
-      <div class="panel-head">
-        <div>
-          <h2>Model Review</h2>
-          <p>Completed FIFA matches are compared with the tool's pre-match prediction, then the model calibration is adjusted conservatively.</p>
+    <section class="panel review-panel model-review-section collapsible-panel">
+      <details>
+        <summary class="panel-head collapsible-summary">
+          <div>
+            <h2>Model Review</h2>
+            <p>Completed FIFA matches are compared with the tool's pre-match prediction, then the model calibration is adjusted conservatively.</p>
+          </div>
+          <span class="collapse-hint"></span>
+        </summary>
+        <div class="collapsible-body">
+          <div class="section-toolbar">
+            <span id="reviewStatus" class="status">Waiting for refresh</span>
+          </div>
+          <div id="reviewMetrics" class="review-metrics"></div>
+          <div id="reviewReasons" class="review-reasons"></div>
+          <div id="reviewTable" class="table-wrap review-table"></div>
         </div>
-        <span id="reviewStatus" class="status">Waiting for refresh</span>
-      </div>
-      <div id="reviewMetrics" class="review-metrics"></div>
-      <div id="reviewReasons" class="review-reasons"></div>
-      <div id="reviewTable" class="table-wrap review-table"></div>
+      </details>
     </section>
 
-    <section class="panel assumptions-panel">
-      <div class="panel-head">
-        <div>
-          <h2>Player Assumptions</h2>
-          <p>FIFA supplies roster, position, age, height, weight, caps and goals. Elite international production now creates an automatic star-player boost; scout traits remain editable.</p>
+    <section class="panel assumptions-panel collapsible-panel">
+      <details>
+        <summary class="panel-head collapsible-summary">
+          <div>
+            <h2>Player Assumptions</h2>
+            <p>FIFA supplies roster, position, age, height, weight, caps and goals. Elite international production now creates an automatic star-player boost; scout traits remain editable.</p>
+          </div>
+          <span class="collapse-hint"></span>
+        </summary>
+        <div class="collapsible-body">
+          <div class="section-toolbar">
+            <button id="clearOverridesBtn" class="ghost-btn" type="button">Clear edits</button>
+          </div>
+          <div class="assumption-editor">
+            <label>
+              Player
+              <select id="playerSelect"></select>
+            </label>
+            <div id="playerSliders" class="player-sliders"></div>
+          </div>
         </div>
-        <button id="clearOverridesBtn" class="ghost-btn" type="button">Clear edits</button>
-      </div>
-      <div class="assumption-editor">
-        <label>
-          Player
-          <select id="playerSelect"></select>
-        </label>
-        <div id="playerSliders" class="player-sliders"></div>
-      </div>
+      </details>
     </section>
 
     <section class="squad-grid">

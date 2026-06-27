@@ -79,6 +79,8 @@ const state = {
   reviewRunId: 0,
   predictionRunId: 0,
   teamHistoryRunId: 0,
+  refreshing: false,
+  pageHiddenAt: null,
   teamHistoryCache: new Map(),
   fixtureTeamFilter: "",
   worldCupHistory: new Map(),
@@ -127,7 +129,9 @@ const els = {
   teamAHistoryMatches: document.getElementById("teamAHistoryMatches"),
   teamBHistoryTitle: document.getElementById("teamBHistoryTitle"),
   teamBHistorySummary: document.getElementById("teamBHistorySummary"),
-  teamBHistoryMatches: document.getElementById("teamBHistoryMatches")
+  teamBHistoryMatches: document.getElementById("teamBHistoryMatches"),
+  stageStatusLabel: document.getElementById("stageStatusLabel"),
+  stageStatusCards: document.getElementById("stageStatusCards")
 };
 
 init();
@@ -142,6 +146,7 @@ function init() {
   } else {
     loadDemo();
   }
+  window.setTimeout(() => refreshFifaData(), 300);
 }
 
 function bindEvents() {
@@ -164,9 +169,24 @@ function bindEvents() {
     predictSelected();
   });
   els.playerSelect.addEventListener("change", renderPlayerEditor);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") {
+      state.pageHiddenAt = Date.now();
+      return;
+    }
+    if (state.pageHiddenAt && Date.now() - state.pageHiddenAt >= 60000) {
+      refreshFifaData();
+    }
+    state.pageHiddenAt = null;
+  });
+  window.addEventListener("pageshow", (event) => {
+    if (event.persisted) refreshFifaData();
+  });
 }
 
 async function refreshFifaData() {
+  if (state.refreshing) return;
+  state.refreshing = true;
   setStatus("Refreshing official FIFA fixtures...");
   setBusy(true);
   try {
@@ -191,6 +211,7 @@ async function refreshFifaData() {
     setStatus("Could not refresh FIFA data. Using saved or demo data.");
     if (!state.fixtures.length) loadDemo();
   } finally {
+    state.refreshing = false;
     setBusy(false);
   }
 }
@@ -438,10 +459,12 @@ async function predictSelected() {
   const fixture = state.selectedFixture;
   if (!teamA || !teamB || teamA.id === teamB.id) {
     updatePredictionEmpty();
+    renderStageStatusEmpty("Choose two different teams to see their current stage points.");
     renderTeamHistoriesEmpty("Choose two different teams to see each team's match history.");
     return;
   }
   updateTeamHistories(teamA, teamB);
+  renderStageStatus(teamA, teamB);
   els.aProbLabel.textContent = `${teamA.abbr || "A"} win`;
   els.bProbLabel.textContent = `${teamB.abbr || "B"} win`;
 
@@ -514,14 +537,14 @@ function renderTeamHistory(team, archive, side) {
     .sort((a, b) => new Date(b.Date) - new Date(a.Date));
   const outcomes = completed.map((match) => teamHistoryOutcome(match, team.id));
   const wins = outcomes.filter((outcome) => outcome === "W").length;
-  const draws = outcomes.filter((outcome) => outcome === "D").length;
+  const draws = outcomes.filter((outcome) => outcome === "T").length;
   const losses = outcomes.filter((outcome) => outcome === "L").length;
 
   title.textContent = `${teamDisplay(team)} match history`;
   summary.innerHTML = `
     <div><span>Matches</span><strong>${completed.length}</strong></div>
     <div class="team-history-win"><span>Wins</span><strong>${wins}</strong></div>
-    <div class="team-history-draw"><span>Draws</span><strong>${draws}</strong></div>
+    <div class="team-history-draw"><span>Ties</span><strong>${draws}</strong></div>
     <div class="team-history-loss"><span>Losses</span><strong>${losses}</strong></div>
   `;
 
@@ -569,8 +592,227 @@ function teamHistoryOutcome(match, teamId) {
   const teamIsHome = match.Home?.IdTeam === teamId;
   const teamScore = number(teamIsHome ? match.Home?.Score : match.Away?.Score, 0);
   const opponentScore = number(teamIsHome ? match.Away?.Score : match.Home?.Score, 0);
-  if (teamScore === opponentScore) return "D";
+  if (teamScore === opponentScore) return "T";
   return teamScore > opponentScore ? "W" : "L";
+}
+
+function renderStageStatus(teamA, teamB) {
+  const fixture = state.selectedFixture;
+  const aStatus = teamStageStatus(teamA, fixture);
+  const bStatus = teamStageStatus(teamB, fixture);
+  const label = aStatus.stageLabel || bStatus.stageLabel || "Current stage";
+  els.stageStatusLabel.textContent = label;
+  els.stageStatusCards.innerHTML = [aStatus, bStatus].map((status) => `
+    <article class="stage-card stage-card-${escapeHtml(status.tone)}">
+      <div class="stage-card-head">
+        <h3>${escapeHtml(teamDisplay(status.team))}</h3>
+        <span class="stage-pass-badge">${escapeHtml(status.passLabel)}</span>
+      </div>
+      <div class="stage-points">
+        <strong>${escapeHtml(status.pointsLabel)}</strong>
+        <span>${escapeHtml(status.pointsCaption)}</span>
+      </div>
+      <div class="stage-detail-grid">
+        <div><span>Rank</span><strong>${escapeHtml(status.rankLabel)}</strong></div>
+        <div><span>Record</span><strong>${escapeHtml(status.recordLabel)}</strong></div>
+        <div><span>Goal diff</span><strong>${escapeHtml(status.goalDiffLabel)}</strong></div>
+      </div>
+      <p>${escapeHtml(status.note)}</p>
+    </article>
+  `).join("");
+}
+
+function renderStageStatusEmpty(message) {
+  els.stageStatusLabel.textContent = "Choose two teams";
+  els.stageStatusCards.innerHTML = `<div class="history-empty">${escapeHtml(message)}</div>`;
+}
+
+function teamStageStatus(team, fixture) {
+  const fixtureForTeam = fixture && [fixture.Home?.IdTeam, fixture.Away?.IdTeam].includes(team.id)
+    ? fixture
+    : fixtureForSelectedTeam(team.id);
+  const groupName = text(fixtureForTeam?.GroupName);
+  const stageName = text(fixtureForTeam?.StageName);
+  const isGroup = /group/i.test(`${groupName} ${stageName}`);
+  if (isGroup && groupName) return teamGroupStatus(team, fixtureForTeam, groupName, stageName);
+  return teamKnockoutStatus(team, fixtureForTeam, stageName || groupName || "Current stage");
+}
+
+function fixtureForSelectedTeam(teamId) {
+  const teamFixtures = state.fixtures.filter((fixture) => [fixture.Home?.IdTeam, fixture.Away?.IdTeam].includes(teamId));
+  return nextFixture(teamFixtures) || teamFixtures.find(isPlayed) || teamFixtures[0] || null;
+}
+
+function teamGroupStatus(team, fixture, groupName, stageName) {
+  const groupFixtures = state.fixtures.filter((item) => sameStageGroup(item, fixture, groupName));
+  const table = groupTable(groupFixtures);
+  const rows = [...table.values()].sort(compareTableRows);
+  const row = table.get(team.id) || emptyTableRow(team);
+  const rank = rows.findIndex((item) => item.team.id === team.id) + 1;
+  const teamMatches = groupFixtures.filter((item) => [item.Home?.IdTeam, item.Away?.IdTeam].includes(team.id));
+  const completed = teamMatches.filter(isPlayed).length;
+  const total = teamMatches.length || 3;
+  const pass = groupPassLabel(rank, completed, total);
+  return {
+    team,
+    tone: pass.tone,
+    passLabel: pass.label,
+    stageLabel: groupName || stageName || "Group stage",
+    pointsLabel: `${row.points} pts`,
+    pointsCaption: `${completed}/${total} group matches played`,
+    rankLabel: rank ? `#${rank}` : "--",
+    recordLabel: `${row.wins}W ${row.draws}T ${row.losses}L`,
+    goalDiffLabel: signedNumber(row.goalDiff),
+    note: pass.note
+  };
+}
+
+function groupPassLabel(rank, completed, total) {
+  const inProgress = completed < total;
+  if (rank && rank <= 2) {
+    return {
+      tone: "pass",
+      label: inProgress ? "Pass now" : "Pass",
+      note: inProgress ? "Currently in an automatic advancing position." : "Finished in an automatic advancing position."
+    };
+  }
+  if (rank === 3) {
+    return {
+      tone: "watch",
+      label: inProgress ? "Watch" : "Maybe pass",
+      note: "Third-place teams may still advance in 2026, so this needs the wider third-place table."
+    };
+  }
+  return {
+    tone: "out",
+    label: inProgress ? "Not pass now" : "Not pass",
+    note: inProgress ? "Currently outside the passing positions." : "Finished outside the passing positions."
+  };
+}
+
+function teamKnockoutStatus(team, fixture, stageName) {
+  const allTeamMatches = state.fixtures.filter((item) => [item.Home?.IdTeam, item.Away?.IdTeam].includes(team.id));
+  const points = tournamentPoints(allTeamMatches, team.id);
+  let passLabel = "Upcoming";
+  let tone = "watch";
+  let note = "This stage has no points table; pass status updates after the match result is official.";
+  if (fixture && isPlayed(fixture) && [fixture.Home?.IdTeam, fixture.Away?.IdTeam].includes(team.id)) {
+    const passed = knockoutWinnerId(fixture) === team.id;
+    passLabel = passed ? "Pass" : "Not pass";
+    tone = passed ? "pass" : "out";
+    note = passed ? "Won this knockout match and moved to the next stage." : "Lost this knockout match and did not move to the next stage.";
+  }
+  return {
+    team,
+    tone,
+    passLabel,
+    stageLabel: stageName || "Current stage",
+    pointsLabel: `${points.points} pts`,
+    pointsCaption: "Total 2026 match points",
+    rankLabel: "Knockout",
+    recordLabel: `${points.wins}W ${points.draws}T ${points.losses}L`,
+    goalDiffLabel: signedNumber(points.goalDiff),
+    note
+  };
+}
+
+function sameStageGroup(match, fixture, groupName) {
+  return /group/i.test(`${text(match.GroupName)} ${text(match.StageName)}`)
+    && text(match.GroupName) === groupName
+    && (!fixture?.StageName || text(match.StageName) === text(fixture.StageName) || /group/i.test(text(match.StageName)));
+}
+
+function groupTable(fixtures) {
+  const table = new Map();
+  fixtures.forEach((fixture) => {
+    if (fixture.Home?.IdTeam) ensureTableRow(table, fixture.Home);
+    if (fixture.Away?.IdTeam) ensureTableRow(table, fixture.Away);
+    if (!isPlayed(fixture)) return;
+    updateTableRow(table.get(fixture.Home.IdTeam), fixture.Home.Score, fixture.Away.Score);
+    updateTableRow(table.get(fixture.Away.IdTeam), fixture.Away.Score, fixture.Home.Score);
+  });
+  return table;
+}
+
+function ensureTableRow(table, apiTeam) {
+  if (!apiTeam?.IdTeam || table.has(apiTeam.IdTeam)) return;
+  table.set(apiTeam.IdTeam, {
+    team: {
+      id: apiTeam.IdTeam,
+      name: teamName(apiTeam),
+      abbr: apiTeam.Abbreviation || apiTeam.IdCountry || "",
+      country: apiTeam.IdCountry || ""
+    },
+    played: 0,
+    wins: 0,
+    draws: 0,
+    losses: 0,
+    goalsFor: 0,
+    goalsAgainst: 0,
+    goalDiff: 0,
+    points: 0
+  });
+}
+
+function emptyTableRow(team) {
+  return {
+    team,
+    played: 0,
+    wins: 0,
+    draws: 0,
+    losses: 0,
+    goalsFor: 0,
+    goalsAgainst: 0,
+    goalDiff: 0,
+    points: 0
+  };
+}
+
+function updateTableRow(row, own, opp) {
+  if (!row) return;
+  const ownScore = number(own, 0);
+  const oppScore = number(opp, 0);
+  row.played += 1;
+  row.goalsFor += ownScore;
+  row.goalsAgainst += oppScore;
+  row.goalDiff = row.goalsFor - row.goalsAgainst;
+  if (ownScore > oppScore) {
+    row.wins += 1;
+    row.points += 3;
+  } else if (ownScore === oppScore) {
+    row.draws += 1;
+    row.points += 1;
+  } else {
+    row.losses += 1;
+  }
+}
+
+function compareTableRows(a, b) {
+  return b.points - a.points
+    || b.goalDiff - a.goalDiff
+    || b.goalsFor - a.goalsFor
+    || a.team.name.localeCompare(b.team.name);
+}
+
+function tournamentPoints(matches, teamId) {
+  const row = emptyTableRow({ id: teamId, name: "", abbr: "" });
+  matches.filter(isPlayed).forEach((match) => {
+    const isHome = match.Home?.IdTeam === teamId;
+    updateTableRow(row, isHome ? match.Home?.Score : match.Away?.Score, isHome ? match.Away?.Score : match.Home?.Score);
+  });
+  return row;
+}
+
+function knockoutWinnerId(fixture) {
+  if (fixture?.Winner) return fixture.Winner;
+  const home = number(fixture?.Home?.Score, 0);
+  const away = number(fixture?.Away?.Score, 0);
+  if (home > away) return fixture.Home?.IdTeam;
+  if (away > home) return fixture.Away?.IdTeam;
+  const homePens = number(fixture?.HomeTeamPenaltyScore, null);
+  const awayPens = number(fixture?.AwayTeamPenaltyScore, null);
+  if (homePens !== null && awayPens !== null) return homePens > awayPens ? fixture.Home?.IdTeam : fixture.Away?.IdTeam;
+  return "";
 }
 
 function matchHistoryScore(match) {
@@ -1367,6 +1609,12 @@ function blend(a, b, weightB) {
 function number(value, fallback) {
   const n = Number(value);
   return Number.isFinite(n) ? n : fallback;
+}
+
+function signedNumber(value) {
+  const n = number(value, 0);
+  if (n > 0) return `+${n}`;
+  return `${n}`;
 }
 
 function clamp(value, min, max) {

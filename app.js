@@ -1152,6 +1152,8 @@ function renderTeamReport(report, side) {
     button.addEventListener("click", () => {
       els.playerSelect.value = button.dataset.playerId;
       renderPlayerEditor();
+      const assumptionsDetails = document.querySelector(".assumptions-panel details");
+      if (assumptionsDetails) assumptionsDetails.open = true;
       document.querySelector(".assumptions-panel").scrollIntoView({ behavior: "smooth", block: "start" });
     });
   });

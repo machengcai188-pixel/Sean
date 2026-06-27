@@ -113,7 +113,7 @@ h2 {
 }
 
 .control-grid {
-  grid-template-columns: minmax(380px, 0.92fr) minmax(520px, 1.08fr);
+  grid-template-columns: 1fr;
   align-items: stretch;
 }
 
@@ -195,6 +195,12 @@ details[open] .collapse-hint::before {
   justify-content: flex-end;
   gap: 10px;
   margin-bottom: 12px;
+}
+
+.player-summary-actions {
+  display: inline-flex;
+  gap: 10px;
+  align-items: center;
 }
 
 label {
@@ -598,7 +604,7 @@ input[type="number"] {
 
 .team-history-match {
   display: grid;
-  grid-template-columns: 40px minmax(0, 1fr);
+  grid-template-columns: 46px minmax(0, 1fr);
   gap: 12px;
   align-items: center;
   padding: 13px;
@@ -626,15 +632,21 @@ input[type="number"] {
   font-weight: 700;
 }
 
-.team-history-result {
-  display: grid;
-  width: 36px;
-  height: 36px;
-  place-items: center;
+.team-history-match .team-history-result {
+  display: flex;
+  width: 42px;
+  height: 42px;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 42px;
+  overflow: visible;
   border-radius: 50%;
   color: white;
-  font-size: 12px;
+  font-size: 15px;
   font-weight: 900;
+  line-height: 1;
+  text-align: center;
+  letter-spacing: 0;
 }
 
 .result-w {
@@ -811,6 +823,10 @@ td.score {
 }
 
 .notes-panel {
+  margin-top: 16px;
+}
+
+.bottom-model-panel {
   margin-top: 16px;
 }
 

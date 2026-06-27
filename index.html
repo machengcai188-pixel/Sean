@@ -48,24 +48,6 @@
         </div>
         <div id="fixtureMeta" class="fixture-meta"></div>
       </div>
-
-      <div class="panel model-panel collapsible-panel">
-        <details>
-          <summary class="panel-head collapsible-summary">
-            <div>
-              <h2>Model Weights</h2>
-              <p>Open this only when you want to adjust how the predictor thinks.</p>
-            </div>
-            <span class="collapse-hint"></span>
-          </summary>
-          <div class="collapsible-body">
-            <div class="section-toolbar">
-              <button id="resetWeightsBtn" class="tiny-btn" type="button">Reset</button>
-            </div>
-            <div id="weightsGrid" class="weights-grid"></div>
-          </div>
-        </details>
-      </div>
     </section>
 
     <section class="prediction-band">
@@ -172,19 +154,33 @@
     </section>
 
     <section class="squad-grid">
-      <div class="panel">
-        <div class="panel-head">
-          <h2 id="teamAPlayersTitle">Team A Players</h2>
-          <span id="teamALoading" class="status"></span>
-        </div>
-        <div id="teamATable" class="table-wrap"></div>
+      <div class="panel player-panel collapsible-panel">
+        <details>
+          <summary class="panel-head collapsible-summary">
+            <h2 id="teamAPlayersTitle">Team A Players</h2>
+            <span class="player-summary-actions">
+              <span id="teamALoading" class="status"></span>
+              <span class="collapse-hint"></span>
+            </span>
+          </summary>
+          <div class="collapsible-body">
+            <div id="teamATable" class="table-wrap"></div>
+          </div>
+        </details>
       </div>
-      <div class="panel">
-        <div class="panel-head">
-          <h2 id="teamBPlayersTitle">Team B Players</h2>
-          <span id="teamBLoading" class="status"></span>
-        </div>
-        <div id="teamBTable" class="table-wrap"></div>
+      <div class="panel player-panel collapsible-panel">
+        <details>
+          <summary class="panel-head collapsible-summary">
+            <h2 id="teamBPlayersTitle">Team B Players</h2>
+            <span class="player-summary-actions">
+              <span id="teamBLoading" class="status"></span>
+              <span class="collapse-hint"></span>
+            </span>
+          </summary>
+          <div class="collapsible-body">
+            <div id="teamBTable" class="table-wrap"></div>
+          </div>
+        </details>
       </div>
     </section>
 
@@ -196,6 +192,24 @@
         <li>Use the previous eight World Cups to distinguish established tournament powers from inexperienced teams.</li>
         <li>Keep subjective scout inputs editable because FIFA does not publish first touch, mentality, xG, xA or pressures in the free official roster endpoint.</li>
       </ul>
+    </section>
+
+    <section class="panel model-panel collapsible-panel bottom-model-panel">
+      <details>
+        <summary class="panel-head collapsible-summary">
+          <div>
+            <h2>Model Weights</h2>
+            <p>Open this only when you want to adjust how the predictor thinks.</p>
+          </div>
+          <span class="collapse-hint"></span>
+        </summary>
+        <div class="collapsible-body">
+          <div class="section-toolbar">
+            <button id="resetWeightsBtn" class="tiny-btn" type="button">Reset</button>
+          </div>
+          <div id="weightsGrid" class="weights-grid"></div>
+        </div>
+      </details>
     </section>
   </main>
 

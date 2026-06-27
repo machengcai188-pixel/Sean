@@ -6,6 +6,7 @@ const FIFA = {
 };
 
 const EASTERN_TIME_ZONE = "America/New_York";
+const CURRENT_MATCH_WINDOW_MS = 3 * 60 * 60 * 1000;
 
 const DEFAULT_CALIBRATION = {
   drawThreshold: 1.1,
@@ -89,7 +90,6 @@ const state = {
 
 const els = {
   refreshBtn: document.getElementById("refreshBtn"),
-  sampleBtn: document.getElementById("sampleBtn"),
   dataStatus: document.getElementById("dataStatus"),
   fixtureTeamFilter: document.getElementById("fixtureTeamFilter"),
   fixtureFilterStatus: document.getElementById("fixtureFilterStatus"),
@@ -144,14 +144,16 @@ function init() {
     hydrateFifaData(cached);
     setStatus(`Loaded saved FIFA data from ${formatDate(cached.savedAt)}`);
   } else {
-    loadDemo();
+    setStatus("Loading official FIFA data...");
+    updatePredictionEmpty();
+    renderStageStatusEmpty("Refresh FIFA data to see the current match.");
+    renderTeamHistoriesEmpty("Refresh FIFA data to see each team's match history.");
   }
   window.setTimeout(() => refreshFifaData(), 300);
 }
 
 function bindEvents() {
   els.refreshBtn.addEventListener("click", refreshFifaData);
-  els.sampleBtn.addEventListener("click", loadDemo);
   els.fixtureTeamFilter.addEventListener("change", onFixtureTeamFilterChange);
   els.fixtureSelect.addEventListener("change", onFixtureChange);
   els.teamASelect.addEventListener("change", predictSelected);
@@ -208,8 +210,12 @@ async function refreshFifaData() {
     setStatus(`Refreshed ${fixtures.length} FIFA fixtures`);
   } catch (error) {
     console.error(error);
-    setStatus("Could not refresh FIFA data. Using saved or demo data.");
-    if (!state.fixtures.length) loadDemo();
+    setStatus("Could not refresh FIFA data. Try again in a moment.");
+    if (!state.fixtures.length) {
+      updatePredictionEmpty();
+      renderStageStatusEmpty("FIFA data could not be reached. Try refreshing again in a moment.");
+      renderTeamHistoriesEmpty("FIFA data could not be reached. Try refreshing again in a moment.");
+    }
   } finally {
     state.refreshing = false;
     setBusy(false);
@@ -233,7 +239,7 @@ function hydrateFifaData(payload) {
   renderFixtureOptions();
   renderModelReviewWaiting();
   const visibleFixtures = filteredFixtures();
-  const defaultFixture = nextFixture(visibleFixtures) || visibleFixtures[0];
+  const defaultFixture = preferredFixture(visibleFixtures);
   if (defaultFixture) {
     els.fixtureSelect.value = defaultFixture.IdMatch;
     selectFixture(defaultFixture);
@@ -424,7 +430,7 @@ function onFixtureTeamFilterChange() {
   state.fixtureTeamFilter = els.fixtureTeamFilter.value;
   renderFixtureOptions();
   const fixtures = filteredFixtures();
-  const fixture = nextFixture(fixtures) || fixtures[0];
+  const fixture = preferredFixture(fixtures);
   if (fixture) {
     els.fixtureSelect.value = fixture.IdMatch;
     selectFixture(fixture);
@@ -1432,31 +1438,6 @@ function renderWeights() {
   });
 }
 
-function loadDemo() {
-  const demo = {
-    savedAt: new Date().toISOString(),
-    season: { IdSeason: FIFA.seasonId },
-    fixtures: [
-      fixtureDemo("demo-1", "Argentina", "ARG", "43922", "France", "FRA", "43946", "2026-06-19T01:00:00Z", "Group Demo"),
-      fixtureDemo("demo-2", "Brazil", "BRA", "43924", "England", "ENG", "43942", "2026-06-20T22:00:00Z", "Group Demo")
-    ]
-  };
-  hydrateFifaData(demo);
-  setStatus("Demo loaded. Use Refresh FIFA data for official fixtures and squads.");
-}
-
-function fixtureDemo(id, homeName, homeAbbr, homeId, awayName, awayAbbr, awayId, date, group) {
-  return {
-    IdMatch: id,
-    Date: date,
-    GroupName: [{ Locale: "en-GB", Description: group }],
-    StageName: [{ Locale: "en-GB", Description: "Demo" }],
-    Stadium: { Name: [{ Locale: "en-GB", Description: "Demo Stadium" }], CityName: [{ Locale: "en-GB", Description: "Demo City" }] },
-    Home: { IdTeam: homeId, IdCountry: homeAbbr, Abbreviation: homeAbbr, TeamName: [{ Locale: "en-GB", Description: homeName }], Score: null },
-    Away: { IdTeam: awayId, IdCountry: awayAbbr, Abbreviation: awayAbbr, TeamName: [{ Locale: "en-GB", Description: awayName }], Score: null }
-  };
-}
-
 function demoSquad(teamName, teamId) {
   const names = ["Keeper", "Right Back", "Centre Back", "Stopper", "Left Back", "Anchor", "Playmaker", "Runner", "Right Wing", "Striker", "Left Wing", "Utility", "Prospect"];
   const roles = ["GK", "DEF", "DEF", "DEF", "DEF", "MID", "MID", "MID", "FWD", "FWD", "FWD", "MID", "FWD"];
@@ -1594,9 +1575,33 @@ function isPlayed(fixture) {
   );
 }
 
+function preferredFixture(fixtures = state.fixtures) {
+  return currentFixture(fixtures)
+    || nextFixture(fixtures)
+    || latestPlayedFixture(fixtures)
+    || fixtures[0]
+    || null;
+}
+
+function currentFixture(fixtures = state.fixtures) {
+  const now = Date.now();
+  return fixtures.find((fixture) => {
+    const kickoff = new Date(fixture.Date).getTime();
+    return Number.isFinite(kickoff)
+      && kickoff <= now
+      && now - kickoff <= CURRENT_MATCH_WINDOW_MS;
+  });
+}
+
 function nextFixture(fixtures = state.fixtures) {
   const now = new Date();
   return fixtures.find((fixture) => new Date(fixture.Date) >= now) || fixtures.find((fixture) => !isPlayed(fixture));
+}
+
+function latestPlayedFixture(fixtures = state.fixtures) {
+  return [...fixtures]
+    .filter(isPlayed)
+    .sort((a, b) => new Date(b.Date) - new Date(a.Date))[0];
 }
 
 function average(values) {

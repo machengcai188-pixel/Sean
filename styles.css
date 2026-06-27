@@ -822,19 +822,8 @@ td.score {
   font-weight: 800;
 }
 
-.notes-panel {
-  margin-top: 16px;
-}
-
 .bottom-model-panel {
   margin-top: 16px;
-}
-
-.notes-panel ul {
-  margin: 10px 0 0;
-  padding-left: 20px;
-  color: var(--muted);
-  line-height: 1.55;
 }
 
 @media (max-width: 1050px) {

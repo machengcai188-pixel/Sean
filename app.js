@@ -709,14 +709,23 @@ function renderChampionCandidates() {
 
   els.championStatus.textContent = `Updated from ${completed.length} completed match${completed.length === 1 ? "" : "es"}`;
   els.championList.innerHTML = candidates.map((candidate, index) => `
-    <article class="champion-row ${index === 0 ? "champion-row-pick" : ""}">
-      <div class="champion-rank">
-        <span>Top ${index + 1}</span>
-        ${index === 0 ? "<b>Pick</b>" : ""}
-      </div>
-      <div class="champion-team">
-        <strong>${escapeHtml(teamDisplay(candidate.team))}</strong>
-        <span>${escapeHtml(candidate.reason)}</span>
+    <details class="champion-row ${index === 0 ? "champion-row-pick" : ""}">
+      <summary class="champion-summary">
+        <div class="champion-rank">
+          <span>Top ${index + 1}</span>
+          ${index === 0 ? "<b>Pick</b>" : ""}
+        </div>
+        <div class="champion-team">
+          <strong>${escapeHtml(teamDisplay(candidate.team))}</strong>
+          <span>Expand details</span>
+        </div>
+        <div class="champion-score">
+          <strong>${candidate.championScore}%</strong>
+          <span>champion score</span>
+        </div>
+      </summary>
+      <div class="champion-details">
+        <p>${escapeHtml(candidate.reason)}</p>
         <div class="champion-factor-grid">
           <em>${escapeHtml(candidate.pointsLabel)}</em>
           <em>${escapeHtml(candidate.goalsLabel)}</em>
@@ -724,11 +733,7 @@ function renderChampionCandidates() {
           <em>${escapeHtml(candidate.strengthLabel)}</em>
         </div>
       </div>
-      <div class="champion-score">
-        <strong>${candidate.championScore}%</strong>
-        <span>champion score</span>
-      </div>
-    </article>
+    </details>
   `).join("");
 }
 

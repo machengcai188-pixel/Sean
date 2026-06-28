@@ -681,6 +681,77 @@ input[type="number"] {
   background: #c2413b;
 }
 
+.star-goals-section {
+  margin-bottom: 16px;
+}
+
+.star-goals-list {
+  display: grid;
+  gap: 9px;
+}
+
+.star-goal-row {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr) 86px;
+  gap: 12px;
+  align-items: center;
+  padding: 13px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #f7fafc;
+}
+
+.star-goal-rank {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  color: white;
+  background: var(--blue);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.star-goal-player strong,
+.star-goal-player span,
+.star-goal-total strong,
+.star-goal-total span {
+  display: block;
+}
+
+.star-goal-player strong {
+  color: var(--ink);
+  font-size: 18px;
+  font-weight: 900;
+  line-height: 1.2;
+}
+
+.star-goal-player span,
+.star-goal-total span {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.star-goal-total {
+  justify-self: end;
+  min-width: 74px;
+  padding: 9px 12px;
+  border-radius: 12px;
+  text-align: center;
+  background: white;
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.star-goal-total strong {
+  color: var(--ink);
+  font-size: 28px;
+  font-weight: 950;
+  line-height: 1;
+}
+
 .model-review-section {
   margin-bottom: 16px;
 }
@@ -882,8 +953,13 @@ td.score {
   }
 
   .team-history-record,
-  .team-history-record-items {
+  .team-history-record-items,
+  .star-goal-row {
     grid-template-columns: 1fr;
+  }
+
+  .star-goal-total {
+    justify-self: stretch;
   }
 
   .fixture-filter label,

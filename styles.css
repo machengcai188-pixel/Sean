@@ -1062,6 +1062,29 @@ td.score {
   margin-top: 16px;
 }
 
+.disclaimer-panel {
+  margin-top: 16px;
+  padding: 16px 18px;
+  border: 1px solid rgba(216, 222, 230, 0.74);
+  border-radius: 8px;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.68);
+  box-shadow: 0 8px 28px rgba(27, 39, 53, 0.06);
+}
+
+.disclaimer-panel h2 {
+  margin-bottom: 6px;
+  color: #344054;
+  font-size: 14px;
+}
+
+.disclaimer-panel p {
+  max-width: 1180px;
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.5;
+}
+
 @media (max-width: 1050px) {
   .control-grid,
   .prediction-band,

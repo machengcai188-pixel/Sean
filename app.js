@@ -84,6 +84,7 @@ const state = {
   starGoalsRunId: 0,
   refreshing: false,
   pageHiddenAt: null,
+  tournamentScorers: [],
   teamHistoryCache: new Map(),
   fixtureTeamFilter: "",
   worldCupHistory: new Map(),
@@ -133,6 +134,8 @@ const els = {
   teamBHistoryMatches: document.getElementById("teamBHistoryMatches"),
   starGoalsStatus: document.getElementById("starGoalsStatus"),
   starGoalsList: document.getElementById("starGoalsList"),
+  championStatus: document.getElementById("championStatus"),
+  championList: document.getElementById("championList"),
   stageStatusLabel: document.getElementById("stageStatusLabel"),
   stageStatusCards: document.getElementById("stageStatusCards")
 };
@@ -152,6 +155,7 @@ function init() {
     renderStageStatusEmpty("Refresh FIFA data to see the current match.");
     renderTeamHistoriesEmpty("Refresh FIFA data to see each team's match history.");
     renderStarGoalsEmpty("Refresh FIFA data to see the tournament-wide top scorers.", "Waiting for FIFA data");
+    renderChampionCandidatesEmpty("Refresh FIFA data to see the top World Cup champion candidates.", "Waiting for FIFA data");
   }
   window.setTimeout(() => refreshFifaData(), 300);
 }
@@ -224,6 +228,7 @@ async function refreshFifaData() {
       renderStageStatusEmpty("FIFA data could not be reached. Try refreshing again in a moment.");
       renderTeamHistoriesEmpty("FIFA data could not be reached. Try refreshing again in a moment.");
       renderStarGoalsEmpty("FIFA data could not be reached. Try refreshing again in a moment.", "FIFA data unavailable");
+      renderChampionCandidatesEmpty("FIFA data could not be reached. Try refreshing again in a moment.", "FIFA data unavailable");
     }
   } finally {
     state.refreshing = false;
@@ -246,6 +251,7 @@ function hydrateFifaData(payload) {
   });
   renderTeamOptions();
   renderFixtureOptions();
+  hydrateWorldCupHistory();
   updateTournamentStarGoals();
   renderModelReviewWaiting();
   const visibleFixtures = filteredFixtures();
@@ -254,7 +260,6 @@ function hydrateFifaData(payload) {
     els.fixtureSelect.value = defaultFixture.IdMatch;
     selectFixture(defaultFixture);
   }
-  hydrateWorldCupHistory();
   runModelReview();
   if (!state.historyLoaded) refreshWorldCupHistoryInBackground();
 }
@@ -300,6 +305,7 @@ async function refreshWorldCupHistoryInBackground() {
   try {
     const seasons = await getWorldCupSeasons();
     await loadWorldCupHistory(seasons);
+    renderChampionCandidates();
     runModelReview();
     predictSelected();
   } catch (error) {
@@ -378,14 +384,18 @@ function updateHistoryTeam(team, own, opp, recencyWeight, knockoutWeight) {
 
 function addTeam(team) {
   if (!team?.IdTeam) return;
-  const abbr = team.Abbreviation || team.IdCountry || "";
-  state.teams.set(team.IdTeam, {
-    id: team.IdTeam,
-    name: text(team.TeamName) || team.ShortClubName || countryNameFromAbbr(abbr) || abbr,
+  state.teams.set(team.IdTeam, apiTeamToTeam(team));
+}
+
+function apiTeamToTeam(team) {
+  const abbr = team?.Abbreviation || team?.IdCountry || "";
+  return {
+    id: team?.IdTeam || "",
+    name: text(team?.TeamName) || team?.ShortClubName || countryNameFromAbbr(abbr) || abbr,
     abbr,
-    country: team.IdCountry || "",
-    flag: team.PictureUrl || ""
-  });
+    country: team?.IdCountry || "",
+    flag: team?.PictureUrl || ""
+  };
 }
 
 function renderTeamOptions() {
@@ -611,11 +621,15 @@ async function updateTournamentStarGoals() {
   try {
     const scorers = await loadTournamentTopScorers();
     if (runId !== state.starGoalsRunId) return;
+    state.tournamentScorers = scorers;
     renderTournamentStarGoals(scorers);
+    renderChampionCandidates();
   } catch (error) {
     console.warn("Tournament top scorers unavailable", error);
     if (runId !== state.starGoalsRunId) return;
+    state.tournamentScorers = [];
     renderStarGoalsEmpty("FIFA's tournament top-scorer data could not be reached. Try refreshing again in a moment.", "Scorers unavailable");
+    renderChampionCandidates();
   }
 }
 
@@ -678,6 +692,152 @@ function renderTournamentStarGoals(scorers) {
 function renderStarGoalsEmpty(message, status = "Waiting for FIFA data") {
   els.starGoalsStatus.textContent = status;
   els.starGoalsList.innerHTML = `<div class="history-empty">${escapeHtml(message)}</div>`;
+}
+
+function renderChampionCandidates() {
+  const completed = state.fixtures.filter((fixture) => isHistoricalResult(fixture) && hasFixtureTeams(fixture));
+  if (!completed.length) {
+    renderChampionCandidatesEmpty("No completed 2026 World Cup matches are official yet, so champion candidates will appear after results arrive.", "Waiting for results");
+    return;
+  }
+
+  const candidates = buildChampionCandidates(completed, state.tournamentScorers).slice(0, 5);
+  if (!candidates.length) {
+    renderChampionCandidatesEmpty("Champion candidates are not available yet. Refresh FIFA data again in a moment.", "No candidates yet");
+    return;
+  }
+
+  els.championStatus.textContent = `Updated from ${completed.length} completed match${completed.length === 1 ? "" : "es"}`;
+  els.championList.innerHTML = candidates.map((candidate, index) => `
+    <article class="champion-row ${index === 0 ? "champion-row-pick" : ""}">
+      <div class="champion-rank">
+        <span>Top ${index + 1}</span>
+        ${index === 0 ? "<b>Pick</b>" : ""}
+      </div>
+      <div class="champion-team">
+        <strong>${escapeHtml(teamDisplay(candidate.team))}</strong>
+        <span>${escapeHtml(candidate.reason)}</span>
+        <div class="champion-factor-grid">
+          <em>${escapeHtml(candidate.pointsLabel)}</em>
+          <em>${escapeHtml(candidate.goalsLabel)}</em>
+          <em>${escapeHtml(candidate.starLabel)}</em>
+          <em>${escapeHtml(candidate.strengthLabel)}</em>
+        </div>
+      </div>
+      <div class="champion-score">
+        <strong>${candidate.championScore}%</strong>
+        <span>champion score</span>
+      </div>
+    </article>
+  `).join("");
+}
+
+function buildChampionCandidates(completed, scorers) {
+  const stats = tournamentTeamStats(completed);
+  const starStats = tournamentScorerStats(scorers);
+  return [...stats.values()].map((row) => {
+    const played = Math.max(1, row.played);
+    const ppg = row.points / played;
+    const gfPerGame = row.goalsFor / played;
+    const gaPerGame = row.goalsAgainst / played;
+    const gdPerGame = row.goalDiff / played;
+    const teamStars = starStats.get(row.team.id) || { goals: 0, playerCount: 0, topPlayer: "", topGoals: 0 };
+    const currentResults = clamp(42 + ppg * 13 + gdPerGame * 5 + Math.min(8, row.played * 1.4), 35, 98);
+    const goalPower = clamp(44 + gfPerGame * 13 + gdPerGame * 3, 35, 98);
+    const defensivePower = clamp(78 - gaPerGame * 11 + gdPerGame * 2, 35, 96);
+    const starPower = clamp(50 + teamStars.topGoals * 8 + teamStars.goals * 3 + Math.min(10, Math.max(0, teamStars.playerCount - 1) * 3), 45, 99);
+    const teamStrength = worldCupPedigreeScore(row.team);
+    const blendedScore = currentResults * 0.36
+      + goalPower * 0.19
+      + starPower * 0.20
+      + teamStrength * 0.18
+      + defensivePower * 0.07;
+    const championScore = Math.round(clamp(blendedScore, 1, 99));
+    return {
+      ...row,
+      championScore,
+      currentResults,
+      goalPower,
+      starPower,
+      teamStrength,
+      defensivePower,
+      reason: championReason(row, teamStars, ppg, gdPerGame),
+      pointsLabel: `${row.points} pts / ${row.played} matches`,
+      goalsLabel: `${row.goalsFor} goals · ${signedNumber(row.goalDiff)} GD`,
+      starLabel: teamStars.topPlayer ? `${teamStars.topPlayer}: ${teamStars.topGoals} goals` : "No top scorer yet",
+      strengthLabel: `Strength ${Math.round(teamStrength)}`
+    };
+  }).sort((a, b) => (
+    b.championScore - a.championScore
+    || b.points - a.points
+    || b.goalDiff - a.goalDiff
+    || b.goalsFor - a.goalsFor
+    || a.team.name.localeCompare(b.team.name)
+  ));
+}
+
+function tournamentTeamStats(completed) {
+  const stats = new Map();
+  completed.forEach((fixture) => {
+    const home = state.teams.get(fixture.Home.IdTeam) || apiTeamToTeam(fixture.Home);
+    const away = state.teams.get(fixture.Away.IdTeam) || apiTeamToTeam(fixture.Away);
+    ensureChampionTeamStats(stats, home);
+    ensureChampionTeamStats(stats, away);
+    updateTableRow(stats.get(home.id), fixture.Home.Score, fixture.Away.Score);
+    updateTableRow(stats.get(away.id), fixture.Away.Score, fixture.Home.Score);
+  });
+  return stats;
+}
+
+function ensureChampionTeamStats(stats, team) {
+  if (!team?.id || stats.has(team.id)) return;
+  stats.set(team.id, {
+    team,
+    played: 0,
+    wins: 0,
+    draws: 0,
+    losses: 0,
+    goalsFor: 0,
+    goalsAgainst: 0,
+    goalDiff: 0,
+    points: 0
+  });
+}
+
+function tournamentScorerStats(scorers) {
+  const stats = new Map();
+  (scorers || []).forEach((player) => {
+    if (!player.team?.id) return;
+    if (!stats.has(player.team.id)) {
+      stats.set(player.team.id, {
+        goals: 0,
+        playerCount: 0,
+        topPlayer: "",
+        topGoals: 0
+      });
+    }
+    const row = stats.get(player.team.id);
+    row.goals += number(player.tournamentGoals, 0);
+    row.playerCount += 1;
+    if (number(player.tournamentGoals, 0) > row.topGoals) {
+      row.topGoals = number(player.tournamentGoals, 0);
+      row.topPlayer = player.shortName || player.name || "";
+    }
+  });
+  return stats;
+}
+
+function championReason(row, stars, ppg, gdPerGame) {
+  if (stars.topPlayer && row.goalDiff > 0) return `${stars.topPlayer} is producing, and the team is winning the goal battle.`;
+  if (ppg >= 2.2) return "Strong results so far make this team one of the safest picks.";
+  if (gdPerGame >= 1) return "Goal difference is trending strongly in the right direction.";
+  if (stars.topPlayer) return `${stars.topPlayer} gives this team a clear star-scorer threat.`;
+  return "Balanced current results and team strength keep this team in the race.";
+}
+
+function renderChampionCandidatesEmpty(message, status = "Waiting for FIFA data") {
+  els.championStatus.textContent = status;
+  els.championList.innerHTML = `<div class="history-empty">${escapeHtml(message)}</div>`;
 }
 
 function is2026FifaWorldCupMatch(match) {

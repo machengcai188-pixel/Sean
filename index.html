@@ -107,18 +107,33 @@
       </div>
     </section>
 
-    <section class="panel star-goals-section">
-      <div class="panel-head">
-        <div>
-          <h2>Top Star Player World Cup Goals</h2>
-          <p>Top 5 scorers across all teams, ranked by total goals in the 2026 FIFA World Cup.</p>
+    <div class="star-dashboard-grid">
+      <section class="panel star-goals-section">
+        <div class="panel-head">
+          <div>
+            <h2>Top Star Player World Cup Goals</h2>
+            <p>Top 5 scorers across all teams.</p>
+          </div>
+          <span id="starGoalsStatus" class="status">Waiting for FIFA data</span>
         </div>
-        <span id="starGoalsStatus" class="status">Waiting for FIFA data</span>
-      </div>
-      <div id="starGoalsList" class="star-goals-list">
-        <div class="history-empty">Refresh FIFA data to see the tournament-wide top scorers.</div>
-      </div>
-    </section>
+        <div id="starGoalsList" class="star-goals-list">
+          <div class="history-empty">Refresh FIFA data to see the tournament-wide top scorers.</div>
+        </div>
+      </section>
+
+      <section class="panel champion-section">
+        <div class="panel-head">
+          <div>
+            <h2>World Cup Champion Prediction</h2>
+            <p>Top 5 candidates based on current results, goals, star scorers and team strength.</p>
+          </div>
+          <span id="championStatus" class="status">Waiting for FIFA data</span>
+        </div>
+        <div id="championList" class="champion-list">
+          <div class="history-empty">Refresh FIFA data to see the champion candidates.</div>
+        </div>
+      </section>
+    </div>
 
     <section class="panel review-panel model-review-section collapsible-panel">
       <details>

@@ -324,30 +324,6 @@ input[type="number"] {
   font-size: 13px;
 }
 
-.factor-breakdown {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-  margin-top: 12px;
-}
-
-.factor-chip {
-  padding: 8px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: #f7fafc;
-  color: var(--muted);
-  font-size: 11px;
-  font-weight: 800;
-}
-
-.factor-chip strong {
-  display: block;
-  margin-top: 3px;
-  color: var(--ink);
-  font-size: 13px;
-}
-
 .prob-bars {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -556,42 +532,85 @@ input[type="number"] {
 }
 
 .team-history-summary {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 7px;
   margin-bottom: 10px;
 }
 
-.team-history-summary div {
-  padding: 9px;
+.team-history-record {
+  display: grid;
+  grid-template-columns: minmax(88px, 0.5fr) minmax(0, 2fr);
+  gap: 10px;
+  align-items: center;
+  padding: 12px;
   border: 1px solid var(--line);
-  border-radius: 9px;
+  border-radius: 12px;
   background: white;
 }
 
-.team-history-summary span {
+.team-history-total span,
+.team-history-record-items em {
   display: block;
   color: var(--muted);
   font-size: 10px;
   font-weight: 800;
+  font-style: normal;
+  letter-spacing: 0.01em;
 }
 
-.team-history-summary strong {
+.team-history-total strong {
   display: block;
-  margin-top: 2px;
-  font-size: 19px;
+  margin-top: 4px;
+  color: var(--ink);
+  font-size: 28px;
+  line-height: 1;
 }
 
-.team-history-win strong {
-  color: var(--green);
+.team-history-record-items {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 9px;
 }
 
-.team-history-draw strong {
-  color: var(--amber);
+.team-history-record-items > span {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  column-gap: 8px;
+  align-items: center;
+  min-width: 0;
+  padding: 8px;
+  border-radius: 10px;
+  background: #f7fafc;
 }
 
-.team-history-loss strong {
-  color: #c2413b;
+.team-history-record-items b {
+  display: flex;
+  width: 32px;
+  height: 32px;
+  grid-row: span 2;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  color: white;
+  font-size: 13px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.team-history-record-items strong {
+  color: var(--ink);
+  font-size: 20px;
+  line-height: 1;
+}
+
+.record-win b {
+  background: var(--green);
+}
+
+.record-draw b {
+  background: var(--amber);
+}
+
+.record-loss b {
+  background: #c2413b;
 }
 
 .team-history-matches {
@@ -839,9 +858,7 @@ td.score {
   .weights-grid,
   .player-sliders,
   .review-metrics,
-  .team-history-summary,
   .stage-detail-grid,
-  .factor-breakdown,
   .prob-bars {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -857,12 +874,15 @@ td.score {
   .team-selectors,
   .fixture-filter,
   .weights-grid,
-    .prob-bars,
-    .player-sliders,
-    .review-metrics,
-    .team-history-summary,
-    .stage-detail-grid,
-    .factor-breakdown {
+  .prob-bars,
+  .player-sliders,
+  .review-metrics,
+  .stage-detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .team-history-record,
+  .team-history-record-items {
     grid-template-columns: 1fr;
   }
 

@@ -109,7 +109,6 @@ const els = {
   aProb: document.getElementById("aProb"),
   bProb: document.getElementById("bProb"),
   tieProb: document.getElementById("tieProb"),
-  factorBreakdown: document.getElementById("factorBreakdown"),
   playerSelect: document.getElementById("playerSelect"),
   playerSliders: document.getElementById("playerSliders"),
   clearOverridesBtn: document.getElementById("clearOverridesBtn"),
@@ -548,10 +547,17 @@ function renderTeamHistory(team, archive, side) {
 
   title.textContent = `${teamDisplay(team)} match history`;
   summary.innerHTML = `
-    <div><span>Matches</span><strong>${completed.length}</strong></div>
-    <div class="team-history-win"><span>Wins</span><strong>${wins}</strong></div>
-    <div class="team-history-draw"><span>Ties</span><strong>${draws}</strong></div>
-    <div class="team-history-loss"><span>Losses</span><strong>${losses}</strong></div>
+    <div class="team-history-record">
+      <div class="team-history-total">
+        <span>Matches</span>
+        <strong>${completed.length}</strong>
+      </div>
+      <div class="team-history-record-items">
+        <span class="record-win"><b>W</b><strong>${wins}</strong><em>Wins</em></span>
+        <span class="record-draw"><b>T</b><strong>${draws}</strong><em>Ties</em></span>
+        <span class="record-loss"><b>L</b><strong>${losses}</strong><em>Losses</em></span>
+      </div>
+    </div>
   `;
 
   if (!completed.length) {
@@ -1079,11 +1085,6 @@ function renderPrediction(aReport, bReport) {
   const confidence = result.pickCode === "TIE" ? result.tieProb : Math.max(result.aProb, result.bProb);
   els.predictionText.textContent = result.pickText;
   els.confidenceText.textContent = `Model confidence: ${(confidence * 100).toFixed(0)}%. Star players and previous World Cup performance now carry more weight.`;
-  els.factorBreakdown.innerHTML = `
-    <div class="factor-chip">World Cup pedigree<strong>${aReport.history.toFixed(0)} - ${bReport.history.toFixed(0)}</strong></div>
-    <div class="factor-chip">Star power<strong>${aReport.starPower.toFixed(0)} - ${bReport.starPower.toFixed(0)}</strong></div>
-    <div class="factor-chip">Current form<strong>${aReport.form.toFixed(0)} - ${bReport.form.toFixed(0)}</strong></div>
-  `;
   [els.aProbBar, els.tieProbBar, els.bProbBar].forEach((bar) => bar.parentElement.parentElement.classList.remove("is-pick"));
   const pickedBar = result.pickCode === "A" ? els.aProbBar : result.pickCode === "B" ? els.bProbBar : els.tieProbBar;
   pickedBar.parentElement.parentElement.classList.add("is-pick");
@@ -1506,7 +1507,6 @@ function weightedScore(metrics, weights) {
 function updatePredictionEmpty() {
   els.predictionText.textContent = "Choose two teams";
   els.confidenceText.textContent = "Select a FIFA fixture or choose two teams manually.";
-  els.factorBreakdown.innerHTML = "";
   [els.aProbBar, els.tieProbBar, els.bProbBar].forEach((bar) => bar.parentElement.parentElement.classList.remove("is-pick"));
   updateBar(els.aProbBar, els.aProb, 0);
   updateBar(els.bProbBar, els.bProb, 0);

@@ -534,7 +534,7 @@ function renderTeamHistory(team, archive, side) {
   const matches = side === "A" ? els.teamAHistoryMatches : els.teamBHistoryMatches;
   const completed = archive
     .filter((match) => (
-      isPlayed(match)
+      isHistoricalResult(match)
       && is2026FifaWorldCupMatch(match)
       && [match.Home?.IdTeam, match.Away?.IdTeam].includes(team.id)
     ))
@@ -662,7 +662,7 @@ function teamGroupStatus(team, fixture, groupName, stageName) {
   const row = table.get(team.id) || emptyTableRow(team);
   const rank = rows.findIndex((item) => item.team.id === team.id) + 1;
   const teamMatches = groupFixtures.filter((item) => [item.Home?.IdTeam, item.Away?.IdTeam].includes(team.id));
-  const completed = teamMatches.filter(isPlayed).length;
+  const completed = teamMatches.filter(isHistoricalResult).length;
   const total = teamMatches.length || 3;
   const pass = groupPassLabel(rank, completed, total);
   return {
@@ -708,7 +708,7 @@ function teamKnockoutStatus(team, fixture, stageName) {
   let passLabel = "Upcoming";
   let tone = "watch";
   let note = "This stage has no points table; pass status updates after the match result is official.";
-  if (fixture && isPlayed(fixture) && [fixture.Home?.IdTeam, fixture.Away?.IdTeam].includes(team.id)) {
+  if (fixture && isHistoricalResult(fixture) && [fixture.Home?.IdTeam, fixture.Away?.IdTeam].includes(team.id)) {
     const passed = knockoutWinnerId(fixture) === team.id;
     passLabel = passed ? "Pass" : "Not pass";
     tone = passed ? "pass" : "out";
@@ -739,7 +739,7 @@ function groupTable(fixtures) {
   fixtures.forEach((fixture) => {
     if (fixture.Home?.IdTeam) ensureTableRow(table, fixture.Home);
     if (fixture.Away?.IdTeam) ensureTableRow(table, fixture.Away);
-    if (!isPlayed(fixture)) return;
+    if (!isHistoricalResult(fixture)) return;
     updateTableRow(table.get(fixture.Home.IdTeam), fixture.Home.Score, fixture.Away.Score);
     updateTableRow(table.get(fixture.Away.IdTeam), fixture.Away.Score, fixture.Home.Score);
   });
@@ -808,7 +808,7 @@ function compareTableRows(a, b) {
 
 function tournamentPoints(matches, teamId) {
   const row = emptyTableRow({ id: teamId, name: "", abbr: "" });
-  matches.filter(isPlayed).forEach((match) => {
+  matches.filter(isHistoricalResult).forEach((match) => {
     const isHome = match.Home?.IdTeam === teamId;
     updateTableRow(row, isHome ? match.Home?.Score : match.Away?.Score, isHome ? match.Away?.Score : match.Home?.Score);
   });
@@ -1575,6 +1575,18 @@ function isPlayed(fixture) {
   );
 }
 
+function isCurrentFixtureWindow(fixture) {
+  const kickoff = new Date(fixture?.Date).getTime();
+  const now = Date.now();
+  return Number.isFinite(kickoff)
+    && kickoff <= now
+    && now - kickoff <= CURRENT_MATCH_WINDOW_MS;
+}
+
+function isHistoricalResult(fixture) {
+  return isPlayed(fixture) && !isCurrentFixtureWindow(fixture);
+}
+
 function preferredFixture(fixtures = state.fixtures) {
   return currentFixture(fixtures)
     || nextFixture(fixtures)
@@ -1584,13 +1596,7 @@ function preferredFixture(fixtures = state.fixtures) {
 }
 
 function currentFixture(fixtures = state.fixtures) {
-  const now = Date.now();
-  return fixtures.find((fixture) => {
-    const kickoff = new Date(fixture.Date).getTime();
-    return Number.isFinite(kickoff)
-      && kickoff <= now
-      && now - kickoff <= CURRENT_MATCH_WINDOW_MS;
-  });
+  return fixtures.find(isCurrentFixtureWindow);
 }
 
 function nextFixture(fixtures = state.fixtures) {

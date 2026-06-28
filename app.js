@@ -7,6 +7,7 @@ const FIFA = {
 
 const EASTERN_TIME_ZONE = "America/New_York";
 const CURRENT_MATCH_WINDOW_MS = 3 * 60 * 60 * 1000;
+const AUTO_REFRESH_INTERVAL_MS = 60 * 1000;
 
 const DEFAULT_CALIBRATION = {
   drawThreshold: 1.1,
@@ -183,6 +184,9 @@ function bindEvents() {
   window.addEventListener("pageshow", (event) => {
     if (event.persisted) refreshFifaData();
   });
+  window.setInterval(() => {
+    if (document.visibilityState !== "hidden") refreshFifaData();
+  }, AUTO_REFRESH_INTERVAL_MS);
 }
 
 async function refreshFifaData() {
@@ -197,6 +201,7 @@ async function refreshFifaData() {
     const matchesUrl = `${FIFA.api}/calendar/matches?language=${FIFA.language}&count=140&idCompetition=${FIFA.competitionId}&idSeason=${FIFA.seasonId}`;
     const matches = await fetchJson(matchesUrl);
     const fixtures = (matches.Results || []).sort((a, b) => new Date(a.Date) - new Date(b.Date));
+    state.teamHistoryCache.clear();
     await loadWorldCupHistory(seasons, true);
     const payload = {
       season,
@@ -532,7 +537,8 @@ function renderTeamHistory(team, archive, side) {
   const title = side === "A" ? els.teamAHistoryTitle : els.teamBHistoryTitle;
   const summary = side === "A" ? els.teamAHistorySummary : els.teamBHistorySummary;
   const matches = side === "A" ? els.teamAHistoryMatches : els.teamBHistoryMatches;
-  const completed = archive
+  const sourceMatches = [...(archive || []), ...state.fixtures];
+  const completed = sourceMatches
     .filter((match) => (
       isHistoricalResult(match)
       && is2026FifaWorldCupMatch(match)
@@ -1053,7 +1059,7 @@ function teamBalanceScore(xi) {
 function tournamentForm(teamId, beforeDate = null, excludeMatchId = null) {
   const cutoff = beforeDate ? new Date(beforeDate) : new Date();
   const played = state.fixtures.filter((fixture) => (
-    isPlayed(fixture)
+    isHistoricalResult(fixture)
     && fixture.IdMatch !== excludeMatchId
     && new Date(fixture.Date) < cutoff
     && [fixture.Home?.IdTeam, fixture.Away?.IdTeam].includes(teamId)
@@ -1192,7 +1198,7 @@ function renderModelReviewWaiting() {
 async function runModelReview() {
   const runId = ++state.reviewRunId;
   const played = state.fixtures
-    .filter((fixture) => isPlayed(fixture) && fixture.Home?.IdTeam && fixture.Away?.IdTeam)
+    .filter((fixture) => isHistoricalResult(fixture) && fixture.Home?.IdTeam && fixture.Away?.IdTeam)
     .sort((a, b) => new Date(a.Date) - new Date(b.Date));
 
   if (!played.length) {
@@ -1565,48 +1571,68 @@ function formatDate(value) {
 
 function isPlayed(fixture) {
   return Boolean(
+    hasMatchScore(fixture)
+    && new Date(fixture.Date) < new Date()
+  );
+}
+
+function hasMatchScore(fixture) {
+  return Boolean(
     fixture?.Home
     && fixture?.Away
     && fixture.Home.Score !== null
     && fixture.Home.Score !== undefined
     && fixture.Away.Score !== null
     && fixture.Away.Score !== undefined
-    && new Date(fixture.Date) < new Date()
   );
+}
+
+function hasFixtureTeams(fixture) {
+  return Boolean(fixture?.Home?.IdTeam && fixture?.Away?.IdTeam);
+}
+
+function hasOfficialFinalStatus(fixture) {
+  if (!hasMatchScore(fixture)) return false;
+  const matchStatus = Number(fixture.MatchStatus);
+  const officialityStatus = Number(fixture.OfficialityStatus);
+  return matchStatus === 0 || officialityStatus >= 2;
 }
 
 function isCurrentFixtureWindow(fixture) {
   const kickoff = new Date(fixture?.Date).getTime();
   const now = Date.now();
   return Number.isFinite(kickoff)
+    && !hasOfficialFinalStatus(fixture)
     && kickoff <= now
     && now - kickoff <= CURRENT_MATCH_WINDOW_MS;
 }
 
 function isHistoricalResult(fixture) {
-  return isPlayed(fixture) && !isCurrentFixtureWindow(fixture);
+  return isPlayed(fixture) && (hasOfficialFinalStatus(fixture) || !isCurrentFixtureWindow(fixture));
 }
 
 function preferredFixture(fixtures = state.fixtures) {
   return currentFixture(fixtures)
     || nextFixture(fixtures)
     || latestPlayedFixture(fixtures)
+    || fixtures.find(hasFixtureTeams)
     || fixtures[0]
     || null;
 }
 
 function currentFixture(fixtures = state.fixtures) {
-  return fixtures.find(isCurrentFixtureWindow);
+  return fixtures.find((fixture) => hasFixtureTeams(fixture) && isCurrentFixtureWindow(fixture));
 }
 
 function nextFixture(fixtures = state.fixtures) {
   const now = new Date();
-  return fixtures.find((fixture) => new Date(fixture.Date) >= now) || fixtures.find((fixture) => !isPlayed(fixture));
+  return fixtures.find((fixture) => hasFixtureTeams(fixture) && new Date(fixture.Date) >= now)
+    || fixtures.find((fixture) => hasFixtureTeams(fixture) && !isPlayed(fixture));
 }
 
 function latestPlayedFixture(fixtures = state.fixtures) {
   return [...fixtures]
-    .filter(isPlayed)
+    .filter(isHistoricalResult)
     .sort((a, b) => new Date(b.Date) - new Date(a.Date))[0];
 }
 

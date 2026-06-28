@@ -633,7 +633,7 @@ function renderStageStatus(teamA, teamB) {
       <div class="stage-detail-grid">
         <div><span>Rank</span><strong>${escapeHtml(status.rankLabel)}</strong></div>
         <div><span>Record</span><strong>${escapeHtml(status.recordLabel)}</strong></div>
-        <div><span>Goal diff</span><strong>${escapeHtml(status.goalDiffLabel)}</strong></div>
+        <div><span>Total goals</span><strong>${escapeHtml(status.totalGoalsLabel)}</strong></div>
       </div>
       <p>${escapeHtml(status.note)}</p>
     </article>
@@ -668,6 +668,7 @@ function teamGroupStatus(team, fixture, groupName, stageName) {
   const row = table.get(team.id) || emptyTableRow(team);
   const rank = rows.findIndex((item) => item.team.id === team.id) + 1;
   const teamMatches = groupFixtures.filter((item) => [item.Home?.IdTeam, item.Away?.IdTeam].includes(team.id));
+  const tournamentTotals = tournamentPoints(teamTournamentFixtures(team.id), team.id);
   const completed = teamMatches.filter(isHistoricalResult).length;
   const total = teamMatches.length || 3;
   const pass = groupPassLabel(rank, completed, total);
@@ -680,7 +681,7 @@ function teamGroupStatus(team, fixture, groupName, stageName) {
     pointsCaption: `${completed}/${total} group matches played`,
     rankLabel: rank ? `#${rank}` : "--",
     recordLabel: `${row.wins}W ${row.draws}T ${row.losses}L`,
-    goalDiffLabel: signedNumber(row.goalDiff),
+    totalGoalsLabel: String(tournamentTotals.goalsFor),
     note: pass.note
   };
 }
@@ -729,9 +730,13 @@ function teamKnockoutStatus(team, fixture, stageName) {
     pointsCaption: "Total 2026 match points",
     rankLabel: "Knockout",
     recordLabel: `${points.wins}W ${points.draws}T ${points.losses}L`,
-    goalDiffLabel: signedNumber(points.goalDiff),
+    totalGoalsLabel: String(points.goalsFor),
     note
   };
+}
+
+function teamTournamentFixtures(teamId) {
+  return state.fixtures.filter((item) => [item.Home?.IdTeam, item.Away?.IdTeam].includes(teamId));
 }
 
 function sameStageGroup(match, fixture, groupName) {

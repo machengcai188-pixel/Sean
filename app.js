@@ -81,6 +81,7 @@ const state = {
   reviewRunId: 0,
   predictionRunId: 0,
   teamHistoryRunId: 0,
+  starGoalsRunId: 0,
   refreshing: false,
   pageHiddenAt: null,
   teamHistoryCache: new Map(),
@@ -150,7 +151,7 @@ function init() {
     updatePredictionEmpty();
     renderStageStatusEmpty("Refresh FIFA data to see the current match.");
     renderTeamHistoriesEmpty("Refresh FIFA data to see each team's match history.");
-    renderStarGoalsEmpty("Choose two teams to see the top World Cup scorers.");
+    renderStarGoalsEmpty("Refresh FIFA data to see the tournament-wide top scorers.", "Waiting for FIFA data");
   }
   window.setTimeout(() => refreshFifaData(), 300);
 }
@@ -222,7 +223,7 @@ async function refreshFifaData() {
       updatePredictionEmpty();
       renderStageStatusEmpty("FIFA data could not be reached. Try refreshing again in a moment.");
       renderTeamHistoriesEmpty("FIFA data could not be reached. Try refreshing again in a moment.");
-      renderStarGoalsEmpty("FIFA data could not be reached. Try refreshing again in a moment.");
+      renderStarGoalsEmpty("FIFA data could not be reached. Try refreshing again in a moment.", "FIFA data unavailable");
     }
   } finally {
     state.refreshing = false;
@@ -245,6 +246,7 @@ function hydrateFifaData(payload) {
   });
   renderTeamOptions();
   renderFixtureOptions();
+  updateTournamentStarGoals();
   renderModelReviewWaiting();
   const visibleFixtures = filteredFixtures();
   const defaultFixture = preferredFixture(visibleFixtures);
@@ -475,12 +477,10 @@ async function predictSelected() {
     updatePredictionEmpty();
     renderStageStatusEmpty("Choose two different teams to see their current stage points.");
     renderTeamHistoriesEmpty("Choose two different teams to see each team's match history.");
-    renderStarGoalsEmpty("Choose two different teams to see the top World Cup scorers.");
     return;
   }
   updateTeamHistories(teamA, teamB);
   renderStageStatus(teamA, teamB);
-  renderStarGoalsLoading(teamA, teamB);
   els.aProbLabel.textContent = `${teamA.abbr || "A"} win`;
   els.bProbLabel.textContent = `${teamB.abbr || "B"} win`;
 
@@ -493,7 +493,6 @@ async function predictSelected() {
   renderTeamReport(bReport, "B");
   renderPrediction(aReport, bReport);
   renderPlayerSelect(aReport, bReport);
-  renderStarGoals(aReport, bReport);
 }
 
 async function updateTeamHistories(teamA, teamB) {
@@ -605,36 +604,62 @@ function renderTeamHistoriesEmpty(message) {
   });
 }
 
-function renderStarGoalsLoading(teamA, teamB) {
-  els.starGoalsStatus.textContent = "Loading scorers...";
-  els.starGoalsList.innerHTML = `<div class="history-empty">Loading World Cup goal totals for ${escapeHtml(teamDisplay(teamA))} and ${escapeHtml(teamDisplay(teamB))}...</div>`;
+async function updateTournamentStarGoals() {
+  const runId = ++state.starGoalsRunId;
+  els.starGoalsStatus.textContent = "Loading tournament scorers...";
+  els.starGoalsList.innerHTML = `<div class="history-empty">Loading 2026 World Cup top scorers across all teams...</div>`;
+  try {
+    const scorers = await loadTournamentTopScorers();
+    if (runId !== state.starGoalsRunId) return;
+    renderTournamentStarGoals(scorers);
+  } catch (error) {
+    console.warn("Tournament top scorers unavailable", error);
+    if (runId !== state.starGoalsRunId) return;
+    renderStarGoalsEmpty("FIFA's tournament top-scorer data could not be reached. Try refreshing again in a moment.", "Scorers unavailable");
+  }
 }
 
-function renderStarGoals(aReport, bReport) {
-  const players = [
-    ...aReport.players.map((player) => ({ ...player, team: aReport.team })),
-    ...bReport.players.map((player) => ({ ...player, team: bReport.team }))
-  ];
-  const ranked = players
-    .map((player) => ({
-      ...player,
-      tournamentGoals: number(player.tournamentGoals, 0)
-    }))
-    .filter((player) => player.tournamentGoals > 0)
+async function loadTournamentTopScorers() {
+  const url = `${FIFA.api}/topseasonplayerstatistics/season/${FIFA.seasonId}/topscorers?language=${FIFA.language}`;
+  const data = await fetchJson(url);
+  return (data.PlayerStatsList || [])
+    .map((row) => {
+      const player = row.PlayerInfo || {};
+      const team = state.teams.get(player.IdTeam) || {
+        id: player.IdTeam || "",
+        name: countryNameFromAbbr(player.IdCountry) || player.IdCountry || "Unknown team",
+        abbr: player.IdCountry || "",
+        country: player.IdCountry || ""
+      };
+      return {
+        id: player.IdPlayer || `${team.id}-${text(player.PlayerName)}`,
+        name: text(player.PlayerName) || "Unknown player",
+        shortName: text(player.PlayerName) || "Unknown",
+        role: "",
+        team,
+        tournamentGoals: number(row.GoalsScored, 0),
+        assists: number(row.Assists, 0),
+        matchesPlayed: number(row.MatchesPlayed, 0)
+      };
+    })
+    .filter((player) => player.tournamentGoals > 0);
+}
+
+function renderTournamentStarGoals(scorers) {
+  const ranked = scorers
     .sort((a, b) => (
       b.tournamentGoals - a.tournamentGoals
-      || b.starScore - a.starScore
       || a.shortName.localeCompare(b.shortName)
+      || a.team.name.localeCompare(b.team.name)
     ))
     .slice(0, 5);
 
   if (!ranked.length) {
-    renderStarGoalsEmpty("No selected player has scored in the 2026 FIFA World Cup yet.");
-    els.starGoalsStatus.textContent = "No goals yet";
+    renderStarGoalsEmpty("No player has scored in the 2026 FIFA World Cup yet.", "No goals yet");
     return;
   }
 
-  els.starGoalsStatus.textContent = `Top ${ranked.length} scorers`;
+  els.starGoalsStatus.textContent = `Top ${ranked.length} tournament scorers`;
   els.starGoalsList.innerHTML = ranked.map((player, index) => `
     <article class="star-goal-row">
       <span class="star-goal-rank">Top ${index + 1}</span>
@@ -650,8 +675,8 @@ function renderStarGoals(aReport, bReport) {
   `).join("");
 }
 
-function renderStarGoalsEmpty(message) {
-  els.starGoalsStatus.textContent = "Choose two teams";
+function renderStarGoalsEmpty(message, status = "Waiting for FIFA data") {
+  els.starGoalsStatus.textContent = status;
   els.starGoalsList.innerHTML = `<div class="history-empty">${escapeHtml(message)}</div>`;
 }
 
@@ -1579,7 +1604,6 @@ function updatePredictionEmpty() {
   updateBar(els.aProbBar, els.aProb, 0);
   updateBar(els.bProbBar, els.bProb, 0);
   updateBar(els.tieProbBar, els.tieProb, 0);
-  renderStarGoalsEmpty("Choose two teams to see the top World Cup scorers.");
 }
 
 function updateBar(bar, label, value) {

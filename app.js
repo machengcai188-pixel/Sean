@@ -701,13 +701,15 @@ function renderChampionCandidates() {
     return;
   }
 
-  const candidates = buildChampionCandidates(completed, state.tournamentScorers).slice(0, 5);
+  const eliminated = eliminatedTeamIds(completed);
+  const candidates = buildChampionCandidates(completed, state.tournamentScorers, eliminated).slice(0, 5);
   if (!candidates.length) {
-    renderChampionCandidatesEmpty("Champion candidates are not available yet. Refresh FIFA data again in a moment.", "No candidates yet");
+    renderChampionCandidatesEmpty("No active champion candidates are available yet. Refresh FIFA data again in a moment.", "No active candidates yet");
     return;
   }
 
-  els.championStatus.textContent = `Updated from ${completed.length} completed match${completed.length === 1 ? "" : "es"}`;
+  const hiddenLabel = eliminated.size ? ` · ${eliminated.size} eliminated team${eliminated.size === 1 ? "" : "s"} hidden` : "";
+  els.championStatus.textContent = `Updated from ${completed.length} completed match${completed.length === 1 ? "" : "es"}${hiddenLabel}`;
   els.championList.innerHTML = candidates.map((candidate, index) => `
     <details class="champion-row ${index === 0 ? "champion-row-pick" : ""}">
       <summary class="champion-summary">
@@ -737,10 +739,10 @@ function renderChampionCandidates() {
   `).join("");
 }
 
-function buildChampionCandidates(completed, scorers) {
+function buildChampionCandidates(completed, scorers, eliminated = new Set()) {
   const stats = tournamentTeamStats(completed);
   const starStats = tournamentScorerStats(scorers);
-  return [...stats.values()].map((row) => {
+  return [...stats.values()].filter((row) => !eliminated.has(row.team.id)).map((row) => {
     const played = Math.max(1, row.played);
     const ppg = row.points / played;
     const gfPerGame = row.goalsFor / played;
@@ -779,6 +781,27 @@ function buildChampionCandidates(completed, scorers) {
     || b.goalsFor - a.goalsFor
     || a.team.name.localeCompare(b.team.name)
   ));
+}
+
+function eliminatedTeamIds(completed) {
+  const eliminated = new Set();
+  [...completed]
+    .filter(isKnockoutFixture)
+    .sort((a, b) => new Date(a.Date) - new Date(b.Date))
+    .forEach((fixture) => {
+      const winnerId = knockoutWinnerId(fixture);
+      if (!winnerId) return;
+      [fixture.Home?.IdTeam, fixture.Away?.IdTeam]
+        .filter((teamId) => teamId && teamId !== winnerId)
+        .forEach((teamId) => eliminated.add(teamId));
+    });
+  return eliminated;
+}
+
+function isKnockoutFixture(fixture) {
+  const stageLabel = `${text(fixture?.StageName)} ${text(fixture?.GroupName)}`.toLowerCase();
+  return /round|quarter|semi|final|third/.test(stageLabel)
+    && !/group|first/.test(stageLabel);
 }
 
 function tournamentTeamStats(completed) {
